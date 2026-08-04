@@ -1,4 +1,10 @@
+# 前端
+node_modules/
+dist/
+*.local
+.DS_Store
+
+# Python（远端历史遗留）
 __pycache__/
 *.pyc
 *.pyo
-.DS_Store
