@@ -1,0 +1,168 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "field:tool_name",
+ "creation": "2026-08-04 01:38:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "tool_name",
+  "description",
+  "tool_type",
+  "column_break_1",
+  "enabled",
+  "category",
+  "section_break_function",
+  "function_name",
+  "parameters_schema",
+  "section_break_impl",
+  "implementation_type",
+  "python_function",
+  "http_endpoint",
+  "http_method",
+  "section_break_meta",
+  "example_input",
+  "example_output",
+  "usage_count",
+  "success_rate"
+ ],
+ "fields": [
+  {
+   "fieldname": "tool_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Tool Name",
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "fieldname": "description",
+   "fieldtype": "Text",
+   "in_list_view": 1,
+   "label": "Description",
+   "reqd": 1
+  },
+  {
+   "fieldname": "tool_type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Tool Type",
+   "options": "Internal\nHTTP\nPython",
+   "default": "Internal"
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "1",
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "label": "Enabled"
+  },
+  {
+   "fieldname": "category",
+   "fieldtype": "Select",
+   "label": "Category",
+   "options": "General\nCalculation\nData\nCommunication\nAutomation\nWeb\nSystem",
+   "default": "General"
+  },
+  {
+   "fieldname": "section_break_function",
+   "fieldtype": "Section Break",
+   "label": "Function"
+  },
+  {
+   "fieldname": "function_name",
+   "fieldtype": "Data",
+   "label": "Function Name"
+  },
+  {
+   "fieldname": "parameters_schema",
+   "fieldtype": "JSON",
+   "label": "Parameters Schema"
+  },
+  {
+   "fieldname": "section_break_impl",
+   "fieldtype": "Section Break",
+   "label": "Implementation"
+  },
+  {
+   "fieldname": "implementation_type",
+   "fieldtype": "Select",
+   "label": "Implementation Type",
+   "options": "Python Function\nHTTP Endpoint",
+   "default": "Python Function"
+  },
+  {
+   "fieldname": "python_function",
+   "fieldtype": "Text",
+   "label": "Python Function"
+  },
+  {
+   "fieldname": "http_endpoint",
+   "fieldtype": "Data",
+   "label": "HTTP Endpoint"
+  },
+  {
+   "fieldname": "http_method",
+   "fieldtype": "Select",
+   "label": "HTTP Method",
+   "options": "GET\nPOST\nPUT\nDELETE",
+   "default": "POST"
+  },
+  {
+   "fieldname": "section_break_meta",
+   "fieldtype": "Section Break",
+   "label": "Metadata"
+  },
+  {
+   "fieldname": "example_input",
+   "fieldtype": "Text",
+   "label": "Example Input"
+  },
+  {
+   "fieldname": "example_output",
+   "fieldtype": "Text",
+   "label": "Example Output"
+  },
+  {
+   "fieldname": "usage_count",
+   "fieldtype": "Int",
+   "label": "Usage Count",
+   "read_only": 1,
+   "default": "0"
+  },
+  {
+   "fieldname": "success_rate",
+   "fieldtype": "Percent",
+   "label": "Success Rate",
+   "read_only": 1
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-08-04 01:38:00.000000",
+ "modified_by": "Administrator",
+ "module": "agent_client",
+ "name": "Tool Definition",
+ "naming_rule": "By fieldname",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "track_changes": 1
+}

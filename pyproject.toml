@@ -1,0 +1,24 @@
+[project]
+name = "agent-client"
+version = "0.0.1"
+description = "Super-intelligent agent interaction client"
+authors = [{ name = "Agent Client" }]
+license = { text = "MIT" }
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "click",
+    "semver",
+    "jinja2",
+    "markdownify",
+    "requests",
+]
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = [
+    "agent_client",
+]

@@ -1,0 +1,168 @@
+{
+ "actions": [
+  {
+   "action": "agent_client.tasks.send_message",
+   "action_type": "Server",
+   "label": "Send Message"
+  }
+ ],
+ "allow_rename": 1,
+ "autoname": "format:CONV-{MM}{DD}-{#####}",
+ "creation": "2026-08-04 01:34:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "title",
+  "agent",
+  "status",
+  "column_break_1",
+  "user",
+  "llm_provider",
+  "model",
+  "section_break_meta",
+  "total_messages",
+  "total_tokens",
+  "latency_ms",
+  "last_message_at",
+  "section_break_memory",
+  "memory_context",
+  "section_break_evolution",
+  "evolution_stage",
+  "evolution_score"
+ ],
+ "fields": [
+  {
+   "fieldname": "title",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Title",
+   "reqd": 1
+  },
+  {
+   "fieldname": "agent",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Agent",
+   "options": "Agent",
+   "reqd": 1
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Status",
+   "options": "Active\nCompleted\nArchived",
+   "default": "Active"
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "user",
+   "fieldtype": "Link",
+   "label": "User",
+   "options": "User"
+  },
+  {
+   "fieldname": "llm_provider",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "LLM Provider",
+   "options": "LLM Provider"
+  },
+  {
+   "fieldname": "model",
+   "fieldtype": "Data",
+   "label": "Model"
+  },
+  {
+   "fieldname": "section_break_meta",
+   "fieldtype": "Section Break",
+   "label": "Metadata"
+  },
+  {
+   "fieldname": "total_messages",
+   "fieldtype": "Int",
+   "label": "Total Messages",
+   "read_only": 1
+  },
+  {
+   "fieldname": "total_tokens",
+   "fieldtype": "Int",
+   "label": "Total Tokens",
+   "read_only": 1
+  },
+  {
+   "fieldname": "latency_ms",
+   "fieldtype": "Int",
+   "label": "Latency (ms)",
+   "read_only": 1
+  },
+  {
+   "fieldname": "last_message_at",
+   "fieldtype": "Datetime",
+   "label": "Last Message At",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_memory",
+   "fieldtype": "Section Break",
+   "label": "Memory Context"
+  },
+  {
+   "fieldname": "memory_context",
+   "fieldtype": "Text",
+   "label": "Memory Context"
+  },
+  {
+   "fieldname": "section_break_evolution",
+   "fieldtype": "Section Break",
+   "label": "Evolution"
+  },
+  {
+   "fieldname": "evolution_stage",
+   "fieldtype": "Select",
+   "label": "Evolution Stage",
+   "options": "Initial\nLearned\nOptimized\nEvolved",
+   "default": "Initial"
+  },
+  {
+   "fieldname": "evolution_score",
+   "fieldtype": "Float",
+   "label": "Evolution Score",
+   "precision": "2"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [
+  {
+   "link_fieldname": "conversation",
+   "link_doctype": "Conversation Message",
+   "group": "Messages"
+  }
+ ],
+ "modified": "2026-08-04 01:34:00.000000",
+ "modified_by": "Administrator",
+ "module": "agent_client",
+ "name": "Conversation",
+ "naming_rule": "Expression",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "track_changes": 1
+}

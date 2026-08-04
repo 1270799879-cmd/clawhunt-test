@@ -1,0 +1,5 @@
+click
+semver
+jinja2
+markdownify
+requests

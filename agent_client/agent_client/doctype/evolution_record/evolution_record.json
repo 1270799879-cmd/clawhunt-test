@@ -1,0 +1,134 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "format:EVO-{MM}{DD}-{#####}",
+ "creation": "2026-08-04 01:39:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "agent",
+  "evolution_type",
+  "status",
+  "column_break_1",
+  "trigger",
+  "score_before",
+  "score_after",
+  "section_break_details",
+  "description",
+  "changes",
+  "section_break_meta",
+  "applied_at",
+  "reviewed",
+  "metadata"
+ ],
+ "fields": [
+  {
+   "fieldname": "agent",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Agent",
+   "options": "Agent",
+   "reqd": 1
+  },
+  {
+   "fieldname": "evolution_type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Evolution Type",
+   "options": "Prompt Tuning\nMemory Update\nParameter Optimization\nTool Learning\nBehavior Adjustment\nPersona Refinement",
+   "reqd": 1
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Status",
+   "options": "Proposed\nApplied\nReverted\nRejected",
+   "default": "Proposed"
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "trigger",
+   "fieldtype": "Select",
+   "label": "Trigger",
+   "options": "Feedback\nSelf Reflection\nPerformance\nThreshold\nManual",
+   "default": "Manual"
+  },
+  {
+   "fieldname": "score_before",
+   "fieldtype": "Float",
+   "label": "Score Before",
+   "precision": "2"
+  },
+  {
+   "fieldname": "score_after",
+   "fieldtype": "Float",
+   "label": "Score After",
+   "precision": "2"
+  },
+  {
+   "fieldname": "section_break_details",
+   "fieldtype": "Section Break",
+   "label": "Details"
+  },
+  {
+   "fieldname": "description",
+   "fieldtype": "Text",
+   "label": "Description"
+  },
+  {
+   "fieldname": "changes",
+   "fieldtype": "JSON",
+   "label": "Changes"
+  },
+  {
+   "fieldname": "section_break_meta",
+   "fieldtype": "Section Break",
+   "label": "Metadata"
+  },
+  {
+   "fieldname": "applied_at",
+   "fieldtype": "Datetime",
+   "label": "Applied At"
+  },
+  {
+   "default": "0",
+   "fieldname": "reviewed",
+   "fieldtype": "Check",
+   "label": "Reviewed"
+  },
+  {
+   "fieldname": "metadata",
+   "fieldtype": "JSON",
+   "label": "Metadata"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-08-04 01:39:00.000000",
+ "modified_by": "Administrator",
+ "module": "agent_client",
+ "name": "Evolution Record",
+ "naming_rule": "Expression",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "track_changes": 1
+}

@@ -1,0 +1,16 @@
+Metadata-Version: 2.4
+Name: agent-client
+Version: 0.0.1
+Summary: Super-intelligent agent interaction client
+Author: Agent Client
+License: MIT
+Requires-Python: >=3.11
+Description-Content-Type: text/markdown
+Requires-Dist: click
+Requires-Dist: semver
+Requires-Dist: jinja2
+Requires-Dist: markdownify
+Requires-Dist: requests
+
+# Agent Client
+Super-intelligent agent interaction client.

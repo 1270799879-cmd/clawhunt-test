@@ -1,0 +1,149 @@
+{
+  "actions": [],
+  "allow_rename": 1,
+  "autoname": "field:server_name",
+  "creation": "2026-08-04 00:00:00.000000",
+  "doctype": "DocType",
+  "engine": "InnoDB",
+  "field_order": [
+    "server_name",
+    "server_type",
+    "transport",
+    "command",
+    "args",
+    "url",
+    "enabled",
+    "status",
+    "description",
+    "section_break_tools",
+    "tools_json",
+    "section_break_meta",
+    "last_checked_at",
+    "last_error"
+  ],
+  "fields": [
+    {
+      "fieldname": "server_name",
+      "fieldtype": "Data",
+      "in_list_view": 1,
+      "label": "服务器名称",
+      "reqd": 1,
+      "unique": 1
+    },
+    {
+      "fieldname": "server_type",
+      "fieldtype": "Select",
+      "in_list_view": 1,
+      "label": "服务器类型",
+      "options": "自定义\n官方",
+      "default": "自定义"
+    },
+    {
+      "fieldname": "transport",
+      "fieldtype": "Select",
+      "in_list_view": 1,
+      "label": "传输方式",
+      "options": "stdio\nHTTP\nSSE",
+      "default": "stdio"
+    },
+    {
+      "fieldname": "command",
+      "fieldtype": "Data",
+      "label": "启动命令 (stdio)",
+      "description": "stdio 传输时用于启动 MCP 服务器的命令，如 npx"
+    },
+    {
+      "fieldname": "args",
+      "fieldtype": "Text",
+      "label": "命令参数 (stdio)",
+      "description": "以空格分隔的命令参数，如 -y @modelcontextprotocol/server-fetch"
+    },
+    {
+      "fieldname": "url",
+      "fieldtype": "Data",
+      "label": "服务器 URL (HTTP/SSE)",
+      "description": "HTTP/SSE 传输时填写 MCP 服务器端点"
+    },
+    {
+      "fieldname": "enabled",
+      "fieldtype": "Check",
+      "label": "启用",
+      "default": 1
+    },
+    {
+      "fieldname": "status",
+      "fieldtype": "Select",
+      "label": "状态",
+      "options": "Untested\nOK\nError",
+      "default": "Untested"
+    },
+    {
+      "fieldname": "description",
+      "fieldtype": "Text",
+      "label": "描述"
+    },
+    {
+      "fieldname": "section_break_tools",
+      "fieldtype": "Section Break",
+      "label": "工具"
+    },
+    {
+      "fieldname": "tools_json",
+      "fieldtype": "JSON",
+      "label": "发现工具 (JSON)",
+      "description": "连接后自动发现的工具列表，勿手动编辑"
+    },
+    {
+      "fieldname": "section_break_meta",
+      "fieldtype": "Section Break",
+      "label": "检测信息"
+    },
+    {
+      "fieldname": "last_checked_at",
+      "fieldtype": "Datetime",
+      "label": "最近检测时间"
+    },
+    {
+      "fieldname": "last_error",
+      "fieldtype": "Text",
+      "label": "最近错误"
+    }
+  ],
+  "index_web_pages_for_search": 1,
+  "links": [],
+  "modified": "2026-08-04 00:00:00.000000",
+  "modified_by": "Administrator",
+  "module": "Agent Client",
+  "name": "MCP Server",
+  "naming_rule": "By fieldname",
+  "owner": "Administrator",
+  "permissions": [
+    {
+      "create": 1,
+      "delete": 1,
+      "email": 1,
+      "export": 1,
+      "print": 1,
+      "read": 1,
+      "report": 1,
+      "role": "System Manager",
+      "share": 1,
+      "write": 1
+    },
+    {
+      "create": 1,
+      "delete": 1,
+      "email": 1,
+      "export": 1,
+      "print": 1,
+      "read": 1,
+      "report": 1,
+      "role": "Administrator",
+      "share": 1,
+      "write": 1
+    }
+  ],
+  "sort_field": "modified",
+  "sort_order": "DESC",
+  "title_field": "server_name"
+}

@@ -1,0 +1,52 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "creation": "2026-08-04 01:31:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "model_name",
+  "context_window",
+  "max_output_tokens",
+  "is_default"
+ ],
+ "fields": [
+  {
+   "fieldname": "model_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Model Name",
+   "reqd": 1
+  },
+  {
+   "fieldname": "context_window",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Context Window"
+  },
+  {
+   "fieldname": "max_output_tokens",
+   "fieldtype": "Int",
+   "label": "Max Output Tokens"
+  },
+  {
+   "default": "0",
+   "fieldname": "is_default",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Is Default"
+  }
+ ],
+ "istable": 1,
+ "links": [],
+ "modified": "2026-08-04 01:31:00.000000",
+ "modified_by": "Administrator",
+ "module": "agent_client",
+ "name": "LLM Provider Model",
+ "naming_rule": "AutoID",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC"
+}

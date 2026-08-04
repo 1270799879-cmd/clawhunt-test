@@ -1,0 +1,207 @@
+{
+ "actions": [
+  {
+   "action": "agent_client.tasks.run_agent_task",
+   "action_type": "Server",
+   "label": "Run Task"
+  }
+ ],
+ "allow_rename": 1,
+ "autoname": "field:agent_name",
+ "creation": "2026-08-04 01:32:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "agent_name",
+  "avatar",
+  "description",
+  "column_break_1",
+  "llm_provider",
+  "model",
+  "temperature",
+  "max_tokens",
+  "section_break_system",
+  "system_prompt",
+  "persona",
+  "section_break_tools",
+  "tools",
+  "section_break_memory",
+  "memory_enabled",
+  "memory_limit",
+  "conversation_limit",
+  "section_break_evolution",
+  "evolution_enabled",
+  "self_reflection_prompt",
+  "section_break_status",
+  "status",
+  "total_conversations",
+  "total_tasks",
+  "last_active_at"
+ ],
+ "fields": [
+  {
+   "fieldname": "agent_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Agent Name",
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "fieldname": "avatar",
+   "fieldtype": "Attach Image",
+   "label": "Avatar"
+  },
+  {
+   "fieldname": "description",
+   "fieldtype": "Text",
+   "label": "Description"
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "llm_provider",
+   "fieldtype": "Link",
+   "label": "LLM Provider",
+   "options": "LLM Provider",
+   "reqd": 1
+  },
+  {
+   "fieldname": "model",
+   "fieldtype": "Data",
+   "label": "Model"
+  },
+  {
+   "fieldname": "temperature",
+   "fieldtype": "Float",
+   "label": "Temperature",
+   "precision": "2"
+  },
+  {
+   "fieldname": "max_tokens",
+   "fieldtype": "Int",
+   "label": "Max Tokens"
+  },
+  {
+   "fieldname": "section_break_system",
+   "fieldtype": "Section Break",
+   "label": "System Prompt"
+  },
+  {
+   "fieldname": "system_prompt",
+   "fieldtype": "Text Editor",
+   "label": "System Prompt"
+  },
+  {
+   "fieldname": "persona",
+   "fieldtype": "Text Editor",
+   "label": "Persona"
+  },
+  {
+   "fieldname": "section_break_tools",
+   "fieldtype": "Section Break",
+   "label": "Tools"
+  },
+  {
+   "fieldname": "tools",
+   "fieldtype": "Table",
+   "label": "Tools",
+   "options": "Agent Tool"
+  },
+  {
+   "fieldname": "section_break_memory",
+   "fieldtype": "Section Break",
+   "label": "Memory"
+  },
+  {
+   "default": "0",
+   "fieldname": "memory_enabled",
+   "fieldtype": "Check",
+   "label": "Memory Enabled"
+  },
+  {
+   "fieldname": "memory_limit",
+   "fieldtype": "Int",
+   "label": "Memory Limit",
+   "default": "20"
+  },
+  {
+   "fieldname": "conversation_limit",
+   "fieldtype": "Int",
+   "label": "Conversation History Limit",
+   "default": "20"
+  },
+  {
+   "fieldname": "section_break_evolution",
+   "fieldtype": "Section Break",
+   "label": "Evolution"
+  },
+  {
+   "default": "0",
+   "fieldname": "evolution_enabled",
+   "fieldtype": "Check",
+   "label": "Evolution Enabled"
+  },
+  {
+   "fieldname": "self_reflection_prompt",
+   "fieldtype": "Text",
+   "label": "Self Reflection Prompt"
+  },
+  {
+   "fieldname": "section_break_status",
+   "fieldtype": "Section Break",
+   "label": "Status"
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "options": "Active\nInactive\nArchived",
+   "default": "Active"
+  },
+  {
+   "fieldname": "total_conversations",
+   "fieldtype": "Int",
+   "label": "Total Conversations",
+   "read_only": 1
+  },
+  {
+   "fieldname": "total_tasks",
+   "fieldtype": "Int",
+   "label": "Total Tasks",
+   "read_only": 1
+  },
+  {
+   "fieldname": "last_active_at",
+   "fieldtype": "Datetime",
+   "label": "Last Active At"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-08-04 01:32:00.000000",
+ "modified_by": "Administrator",
+ "module": "agent_client",
+ "name": "Agent",
+ "naming_rule": "By fieldname",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "track_changes": 1
+}

@@ -1,0 +1,139 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "field:provider_name",
+ "creation": "2026-08-04 01:30:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "provider_name",
+  "provider_type",
+  "api_base_url",
+  "api_key",
+  "enabled",
+  "section_break_models",
+  "default_model",
+  "available_models",
+  "section_break_defaults",
+  "default_temperature",
+  "default_max_tokens",
+  "timeout_seconds",
+  "section_break_status",
+  "last_checked_at",
+  "status"
+ ],
+ "fields": [
+  {
+   "fieldname": "provider_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Provider Name",
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "fieldname": "provider_type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Provider Type",
+   "options": "OpenAI\nAnthropic\nGemini\nOllama\nCustom",
+   "reqd": 1
+  },
+  {
+   "fieldname": "api_base_url",
+   "fieldtype": "Data",
+   "label": "API Base URL"
+  },
+  {
+   "fieldname": "api_key",
+   "fieldtype": "Password",
+   "label": "API Key"
+  },
+  {
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "default": "0",
+   "label": "Enabled"
+  },
+  {
+   "fieldname": "section_break_models",
+   "fieldtype": "Section Break",
+   "label": "Models"
+  },
+  {
+   "fieldname": "default_model",
+   "fieldtype": "Data",
+   "label": "Default Model"
+  },
+  {
+   "fieldname": "available_models",
+   "fieldtype": "Table",
+   "label": "Available Models",
+   "options": "LLM Provider Model"
+  },
+  {
+   "fieldname": "section_break_defaults",
+   "fieldtype": "Section Break",
+   "label": "Defaults"
+  },
+  {
+   "fieldname": "default_temperature",
+   "fieldtype": "Float",
+   "label": "Default Temperature",
+   "precision": "2"
+  },
+  {
+   "fieldname": "default_max_tokens",
+   "fieldtype": "Int",
+   "label": "Default Max Tokens"
+  },
+  {
+   "fieldname": "timeout_seconds",
+   "fieldtype": "Int",
+   "label": "Timeout (seconds)",
+   "default": "60"
+  },
+  {
+   "fieldname": "section_break_status",
+   "fieldtype": "Section Break",
+   "label": "Status"
+  },
+  {
+   "fieldname": "last_checked_at",
+   "fieldtype": "Datetime",
+   "label": "Last Checked At"
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "options": "Untested\nOK\nFailed",
+   "default": "Untested"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-08-04 01:30:00.000000",
+ "modified_by": "Administrator",
+ "module": "agent_client",
+ "name": "LLM Provider",
+ "naming_rule": "By fieldname",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "track_changes": 1
+}
