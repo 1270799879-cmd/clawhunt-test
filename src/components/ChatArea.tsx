@@ -27,11 +27,30 @@ export default function ChatArea({ agent, conversation, providers }: Props) {
     const file = e.target.files?.[0];
     if (!file) return;
     if (!file.type.startsWith("image/")) {
+      console.warn("[ChatArea] 图片选择被拒绝：非图片类型", file.type, file.name);
       setRatingError("请选择图片文件");
       return;
     }
+    console.log("[ChatArea] 图片选择：", {
+      name: file.name,
+      type: file.type,
+      size: file.size,
+      sizeKB: (file.size / 1024).toFixed(1),
+    });
     const reader = new FileReader();
-    reader.onload = () => setImageData(typeof reader.result === "string" ? reader.result : "");
+    reader.onload = () => {
+      const data = typeof reader.result === "string" ? reader.result : "";
+      // 仅记录元数据，不落完整 base64
+      const mime = data ? data.slice(5, data.indexOf(";")) : "";
+      console.log("[ChatArea] 图片读取完成：", {
+        mime,
+        dataURLLength: data.length,
+        base64Length: data.includes(",") ? data.length - data.indexOf(",") - 1 : 0,
+        isBase64: data.includes(";base64,"),
+      });
+      setImageData(data);
+    };
+    reader.onerror = (err) => console.error("[ChatArea] 图片读取失败：", err);
     reader.readAsDataURL(file);
     e.target.value = "";
   };
@@ -124,8 +143,26 @@ export default function ChatArea({ agent, conversation, providers }: Props) {
     setMessages((m) => [...m, userMsg]);
     try {
       const modelToUse = selectedProvider || undefined;
+      console.log("[ChatArea] 发送消息：", {
+        conversation: conversation.name,
+        model: modelToUse || "默认(用智能体配置)",
+        hasImage: !!imageData,
+        textLength: content.length,
+        dataURLLength: imageData ? imageData.length : 0,
+        base64Length:
+          imageData && imageData.includes(",")
+            ? imageData.length - imageData.indexOf(",") - 1
+            : 0,
+        mime: imageData ? imageData.slice(5, imageData.indexOf(";")) : "",
+      });
       const res = await sendMessage(conversation.name, content, modelToUse, imageData || undefined);
       if (res.ok) {
+        console.log("[ChatArea] 发送成功：", {
+          tokens: res.tokens,
+          latency_ms: res.latency_ms,
+          tools_used: res.tools_used,
+          replyLength: res.reply.length,
+        });
         const asstMsg: ChatMessage = {
           name: `tmp-${Date.now()}`,
           role: "Assistant",
@@ -140,6 +177,11 @@ export default function ChatArea({ agent, conversation, providers }: Props) {
         notifyAssistantReply(res.reply);
       } else {
         // 出错情况，追加错误消息
+        console.warn("[ChatArea] 后端返回错误：", {
+          ok: res.ok,
+          error: res.error,
+          hasImage: !!imageData,
+        });
         const errMsg: ChatMessage = {
           name: `tmp-${Date.now()}`,
           role: "System",
@@ -152,6 +194,10 @@ export default function ChatArea({ agent, conversation, providers }: Props) {
         setMessages((m) => [...m, errMsg]);
       }
     } catch (e) {
+      console.error("[ChatArea] 发送异常：", e, {
+        hasImage: !!imageData,
+        textLength: content.length,
+      });
       const errMsg: ChatMessage = {
         name: `tmp-${Date.now()}`,
         role: "System",
