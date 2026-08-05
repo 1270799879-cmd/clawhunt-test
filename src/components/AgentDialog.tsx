@@ -5,7 +5,8 @@
 //   工具绑定用勾选列表并标注来源（内置 / 函数 / HTTP / MCP）
 // ============================================================
 import { useEffect, useState } from "react";
-import type { Agent, AgentDetail, AgentTool, LLMProvider, ToolDefinition } from "../types";
+import type { Agent, AgentDetail, AgentTool, LLMProvider, ToolDefinition, PersonaCard } from "../types";
+import { parsePersona, serializePersona } from "../types";
 import {
   deleteAgent,
   getAgent,
@@ -13,6 +14,7 @@ import {
   listProviders,
   listTools,
   saveAgent,
+  savePersonaCard,
 } from "../api/client";
 
 interface Props {
@@ -57,6 +59,21 @@ const EMPTY_FORM: AgentForm = {
   tools: [],
 };
 
+// 角色卡：头像 emoji 预设（批次B）
+const AVATAR_PRESETS = ["🤖", "💼", "🧠", "🛠️", "🎨", "📊", "🧑‍⚕️", "👩‍🏫", "🐱", "🦉", "⚡", "🌟"];
+
+// 角色标签预设（批次B）
+const TAG_PRESETS = ["专业", "耐心", "幽默", "严谨", "友好", "高效", "创意", "简洁"];
+
+const EMPTY_CARD: PersonaCard = {
+  avatar: "",
+  name: "",
+  tags: [],
+  summary: "",
+  tone_example: "",
+  system_prompt: "",
+};
+
 const implLabel = (impl: string) =>
   impl === "Python Function" ? "🐍 函数" : impl === "HTTP Endpoint" ? "🌐 HTTP" : "⚙️ 内置";
 
@@ -71,6 +88,10 @@ export default function AgentDialog({ open, onClose, onChanged }: Props) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [toast, setToast] = useState("");
+  // 角色卡编辑态（批次B）：persona 的 JSON 解析结果
+  const [personaCard, setPersonaCard] = useState<PersonaCard>(EMPTY_CARD);
+  // 旧版纯文本人设（当 persona 不是 JSON 时，作为兼容展示+可切换）
+  const [legacyPersona, setLegacyPersona] = useState("");
 
   const showToast = (msg: string) => {
     setToast(msg);
@@ -129,6 +150,10 @@ export default function AgentDialog({ open, onClose, onChanged }: Props) {
     try {
       const res = await getAgent(a.name);
       const d: AgentDetail = res.agent;
+      // 解析 persona：结构化 JSON 进卡片，否则存为旧版纯文本兼容
+      const card = parsePersona(d.persona);
+      setPersonaCard(card ?? EMPTY_CARD);
+      setLegacyPersona(card ? "" : (d.persona || ""));
       setForm({
         name: d.name,
         agent_name: d.agent_name,
@@ -172,6 +197,13 @@ export default function AgentDialog({ open, onClose, onChanged }: Props) {
     setSaving(true);
     setError("");
     try {
+      // persona：若卡片有内容则保存为结构化 JSON，否则回退纯文本
+      const cardHasContent =
+        personaCard.avatar || personaCard.name || personaCard.summary ||
+        personaCard.tone_example || personaCard.tags.length > 0;
+      const personaValue = cardHasContent
+        ? serializePersona(personaCard)
+        : legacyPersona;
       const payload: Record<string, unknown> = {
         name: form.name || undefined,
         agent_name: form.agent_name.trim(),
@@ -181,7 +213,7 @@ export default function AgentDialog({ open, onClose, onChanged }: Props) {
         temperature: form.temperature,
         max_tokens: form.max_tokens,
         system_prompt: form.system_prompt,
-        persona: form.persona,
+        persona: personaValue,
         memory_enabled: form.memory_enabled ? 1 : 0,
         memory_limit: form.memory_limit,
         conversation_limit: form.conversation_limit,
@@ -192,6 +224,14 @@ export default function AgentDialog({ open, onClose, onChanged }: Props) {
           .map((t) => ({ tool: t.tool, tool_name: t.tool_name, enabled: 1 })),
       };
       await saveAgent(payload);
+      // 若人设卡片非空，也调用 save_persona_card 确保结构化字段精确落库
+      if (cardHasContent) {
+        try {
+          await savePersonaCard(form.name || payload.agent_name as string, { ...personaCard });
+        } catch (e) {
+          console.error("save_persona_card 失败（不影响主保存）", e);
+        }
+      }
       showToast(form.name ? "已更新" : "已创建");
       onChanged();
       setMode("list");
@@ -380,14 +420,118 @@ export default function AgentDialog({ open, onClose, onChanged }: Props) {
             </div>
 
             <div className="form-group">
-              <label className="form-label">人设（Persona）</label>
-              <textarea
-                className="input textarea"
-                rows={2}
-                value={form.persona}
-                onChange={(e) => setForm({ ...form, persona: e.target.value })}
-                placeholder="如：你是一位资深的、乐于助人的数据分析师，擅长用通俗的语言解释复杂数据。"
-              />
+              <div className="form-label" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span>角色卡 / 人设（Persona）</span>
+                <span className="list-item-sub" style={{ fontSize: 11 }}>结构化编辑，可保存并在对话中生效</span>
+              </div>
+
+              {/* 旧版纯文本人设兼容编辑 */}
+              <div className="persona-legacy">
+                <label className="switch-label" style={{ marginBottom: 6 }}>
+                  <input
+                    type="checkbox"
+                    checked={legacyPersona !== ""}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setLegacyPersona(personaCard.summary || personaCard.name || "");
+                        setPersonaCard(EMPTY_CARD);
+                      } else {
+                        setLegacyPersona("");
+                      }
+                    }}
+                  />
+                  <span className="switch-ui" />
+                  使用纯文本人设（旧版）
+                </label>
+                {legacyPersona !== "" && (
+                  <textarea
+                    className="input textarea"
+                    rows={2}
+                    value={legacyPersona}
+                    onChange={(e) => setLegacyPersona(e.target.value)}
+                    placeholder="如：你是一位资深的、乐于助人的数据分析师，擅长用通俗的语言解释复杂数据。"
+                  />
+                )}
+              </div>
+
+              {/* 结构化角色卡片编辑 */}
+              {legacyPersona === "" && (
+                <div className="persona-card-edit">
+                  <div className="form-group">
+                    <label className="form-label">头像（Avatar）</label>
+                    <div className="avatar-picker">
+                      {AVATAR_PRESETS.map((e) => (
+                        <button
+                          key={e}
+                          type="button"
+                          className={`avatar-opt ${personaCard.avatar === e ? "active" : ""}`}
+                          onClick={() => setPersonaCard((c) => ({ ...c, avatar: e }))}
+                        >
+                          {e}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="form-grid-2">
+                    <div className="form-group">
+                      <label className="form-label">角色名称</label>
+                      <input
+                        className="input"
+                        value={personaCard.name}
+                        onChange={(e) => setPersonaCard((c) => ({ ...c, name: e.target.value }))}
+                        placeholder="如 数据分析师 / 客服助手"
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">性格标签</label>
+                      <div className="tag-picker">
+                        {TAG_PRESETS.map((t) => {
+                          const on = personaCard.tags.includes(t);
+                          return (
+                            <button
+                              key={t}
+                              type="button"
+                              className={`tag-opt ${on ? "active" : ""}`}
+                              onClick={() =>
+                                setPersonaCard((c) =>
+                                  on
+                                    ? { ...c, tags: c.tags.filter((x) => x !== t) }
+                                    : { ...c, tags: [...c.tags, t] }
+                                )
+                              }
+                            >
+                              {t}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">性格摘要</label>
+                    <textarea
+                      className="input textarea"
+                      rows={2}
+                      value={personaCard.summary}
+                      onChange={(e) => setPersonaCard((c) => ({ ...c, summary: e.target.value }))}
+                      placeholder="一句话概括这个角色的性格与专长"
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">语气示例（Tone Example）</label>
+                    <textarea
+                      className="input textarea"
+                      rows={2}
+                      value={personaCard.tone_example}
+                      onChange={(e) => setPersonaCard((c) => ({ ...c, tone_example: e.target.value }))}
+                      placeholder="例如：回答尽量言简意赅，多用数据说话。"
+                    />
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="form-group">

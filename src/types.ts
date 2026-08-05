@@ -47,6 +47,51 @@ export interface AgentDetail extends Agent {
   tools: AgentTool[];
 }
 
+// 角色卡 / 人设卡（批次B）：persona 的结构化 JSON 形态
+export interface PersonaCard {
+  avatar: string;
+  name: string;
+  tags: string[];
+  summary: string;
+  tone_example: string;
+  system_prompt: string;
+}
+
+// 首次使用引导状态（批次B）
+export interface OnboardingState {
+  ok: boolean;
+  user: string;
+  onboarded: boolean;
+}
+
+// 解析 persona：兼容 JSON 结构化与旧版纯文本两种形态
+export function parsePersona(persona?: string | null): PersonaCard | null {
+  if (!persona) return null;
+  const t = persona.trim();
+  if (!(t.startsWith("{") && t.endsWith("}"))) return null;
+  try {
+    const d = JSON.parse(t);
+    if (d && typeof d === "object" && !Array.isArray(d)) {
+      return {
+        avatar: String(d.avatar ?? ""),
+        name: String(d.name ?? ""),
+        tags: Array.isArray(d.tags) ? d.tags.map((x: unknown) => String(x)) : [],
+        summary: String(d.summary ?? ""),
+        tone_example: String(d.tone_example ?? ""),
+        system_prompt: String(d.system_prompt ?? ""),
+      };
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+// 将 PersonaCard 序列化为后端存储的 JSON 字符串
+export function serializePersona(card: PersonaCard): string {
+  return JSON.stringify(card);
+}
+
 export interface AgentTool {
   tool: string;
   tool_name: string;

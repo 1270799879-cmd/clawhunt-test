@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import type { Agent, Conversation, LLMProvider } from "./types";
-import { listProviders } from "./api/client";
+import { listProviders, getOnboardingState } from "./api/client";
 import Login from "./components/Login";
 import IconRail, { type ViewKey, type ManagementKey } from "./components/IconRail";
 import Sidebar from "./components/Sidebar";
@@ -11,6 +11,7 @@ import AgentDialog from "./components/AgentDialog";
 import ConfigDialog from "./components/ConfigDialog";
 import SettingsDialog from "./components/SettingsDialog";
 import MCPDialog from "./components/MCPDialog";
+import OnboardingGuide from "./components/OnboardingGuide";
 
 export default function App() {
   const [loggedIn, setLoggedIn] = useState(false);
@@ -24,6 +25,8 @@ export default function App() {
   const [agentDialogOpen, setAgentDialogOpen] = useState(false);
   const [settingsDialogOpen, setSettingsDialogOpen] = useState(false);
   const [mcpDialogOpen, setMCPDialogOpen] = useState(false);
+  // 首次引导（批次B）
+  const [showOnboarding, setShowOnboarding] = useState(false);
 
   // 加载 Provider 列表供模型切换下拉使用
   useEffect(() => {
@@ -31,6 +34,12 @@ export default function App() {
       listProviders()
         .then(res => setProviders(res.providers))
         .catch(err => console.error("加载模型提供商失败", err));
+      // 拉取首次引导状态：未完成则展示引导浮层（进度存后端，不依赖本地存储）
+      getOnboardingState()
+        .then((res) => {
+          if (!res.onboarded) setShowOnboarding(true);
+        })
+        .catch((err) => console.error("获取引导状态失败", err));
     }
   }, [loggedIn]);
 
@@ -94,6 +103,9 @@ export default function App() {
       <SettingsDialog open={settingsDialogOpen} onClose={() => setSettingsDialogOpen(false)} />
       <MCPDialog open={mcpDialogOpen} onClose={() => setMCPDialogOpen(false)} />
       <ConfigDialog />
+      {showOnboarding && (
+        <OnboardingGuide onClose={() => setShowOnboarding(false)} />
+      )}
     </div>
   );
 }

@@ -15,6 +15,7 @@ import type {
   MCPServerDetail,
   MCPTool,
   MemoryEntry,
+  OnboardingState,
   ProviderDetail,
   RuntimeMetrics,
   ToolDefinition,
@@ -225,4 +226,19 @@ export const testMCPServer = (serverName: string) =>
     "POST",
     "test_mcp_server",
     { server_name: serverName }
+  );
+
+// ---------- 首次使用引导（批次B） ----------
+export const getOnboardingState = () =>
+  request<OnboardingState>("GET", "get_onboarding_state");
+export const completeOnboarding = () =>
+  request<OnboardingState>("POST", "complete_onboarding");
+
+// ---------- 角色卡 / 人设卡（批次B） ----------
+export const savePersonaCard = (agent: string, personaData: Record<string, unknown>) =>
+  request<{ ok: boolean; name: string; persona: string }>(
+    "POST",
+    "save_persona_card",
+    { agent, persona_data: JSON.stringify(personaData) },
+    true
   );
