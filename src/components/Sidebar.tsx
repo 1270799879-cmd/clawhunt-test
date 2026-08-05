@@ -1,12 +1,19 @@
 import { useEffect, useState } from "react";
 import type { Agent, Conversation } from "../types";
-import { listAgents, listConversations, newConversation } from "../api/client";
+import {
+  listAgents,
+  listConversations,
+  newConversation,
+  renameConversation,
+  archiveConversation,
+  deleteConversation,
+} from "../api/client";
 
 interface Props {
   selectedAgent: Agent | null;
   onSelectAgent: (a: Agent) => void;
   selectedConversation: Conversation | null;
-  onSelectConversation: (c: Conversation) => void;
+  onSelectConversation: (c: Conversation | null) => void;
 }
 
 export default function Sidebar({
@@ -20,6 +27,10 @@ export default function Sidebar({
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState("");
+  // 会话管理（批次 A）
+  const [showArchived, setShowArchived] = useState(false);
+  const [editingName, setEditingName] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState("");
 
   const loadAgents = async () => {
     try {
@@ -30,9 +41,9 @@ export default function Sidebar({
     }
   };
 
-  const loadConversations = async (agent?: string) => {
+  const loadConversations = async (agent?: string, archived?: boolean) => {
     try {
-      const res = await listConversations(agent);
+      const res = await listConversations(agent, archived ? 1 : 0);
       setConversations(res.conversations);
     } catch (e) {
       console.error(e);
@@ -44,12 +55,8 @@ export default function Sidebar({
   }, []);
 
   useEffect(() => {
-    if (selectedAgent) {
-      loadConversations(selectedAgent.name);
-    } else {
-      loadConversations();
-    }
-  }, [selectedAgent]);
+    loadConversations(selectedAgent?.name, showArchived);
+  }, [selectedAgent, showArchived]);
 
   const createConversation = async () => {
     if (!selectedAgent) return;
@@ -57,12 +64,56 @@ export default function Sidebar({
     setCreateError("");
     try {
       const res = await newConversation("新对话", selectedAgent.name);
-      await loadConversations(selectedAgent.name);
+      await loadConversations(selectedAgent.name, false);
       onSelectConversation({ name: res.name, title: res.title, agent: selectedAgent.name, status: "Active", total_messages: 0, creation: "", modified: "" });
     } catch (e) {
       setCreateError(e instanceof Error ? e.message : "新建会话失败");
     } finally {
       setCreating(false);
+    }
+  };
+
+  // 重命名提交
+  const commitRename = async (c: Conversation) => {
+    const title = editValue.trim();
+    setEditingName(null);
+    if (!title || title === c.title) return;
+    try {
+      await renameConversation(c.name, title);
+      onSelectConversation({ ...c, title });
+      await loadConversations(selectedAgent?.name, showArchived);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  // 归档 / 恢复
+  const toggleArchive = async (c: Conversation, archived: boolean) => {
+    const action = archived ? "归档" : "恢复";
+    if (!window.confirm(`确定要${action}会话「${c.title}」吗？`)) return;
+    try {
+      await archiveConversation(c.name, archived);
+      if (selectedConversation?.name === c.name) {
+        // 归档当前会话时清空选中；恢复时保留
+        onSelectConversation(archived ? null : { ...c, status: "Active" });
+      }
+      await loadConversations(selectedAgent?.name, showArchived);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  // 删除
+  const handleDelete = async (c: Conversation) => {
+    if (!window.confirm(`确定要删除会话「${c.title}」吗？该操作不可撤销。`)) return;
+    try {
+      await deleteConversation(c.name);
+      if (selectedConversation?.name === c.name) {
+        onSelectConversation(null);
+      }
+      await loadConversations(selectedAgent?.name, showArchived);
+    } catch (e) {
+      console.error(e);
     }
   };
 
@@ -119,14 +170,24 @@ export default function Sidebar({
 
       <div className="section-label">
         <span>会话</span>
-        <button
-          className="btn btn-ghost"
-          style={{ padding: "2px 8px", fontSize: 12 }}
-          onClick={createConversation}
-          disabled={!selectedAgent || creating}
-        >
-          {creating ? <span className="spinner" /> : "＋ 新建"}
-        </button>
+        <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+          <button
+            className="btn btn-ghost"
+            style={{ padding: "2px 8px", fontSize: 12 }}
+            onClick={() => setShowArchived((v) => !v)}
+            title={showArchived ? "返回未归档会话" : "查看已归档会话"}
+          >
+            {showArchived ? "📁 未归档" : "🗂 归档"}
+          </button>
+          <button
+            className="btn btn-ghost"
+            style={{ padding: "2px 8px", fontSize: 12 }}
+            onClick={createConversation}
+            disabled={!selectedAgent || creating}
+          >
+            {creating ? <span className="spinner" /> : "＋ 新建"}
+          </button>
+        </div>
       </div>
       {createError && (
         <div style={{ padding: "0 12px 8px", fontSize: 12, color: "var(--danger)" }}>⚠️ {createError}</div>
@@ -135,14 +196,14 @@ export default function Sidebar({
         {conversations.length === 0 ? (
           <div className="empty">
             <div className="empty-icon">💬</div>
-            <div>选择一个智能体开始对话</div>
+            <div>{showArchived ? "暂无已归档会话" : "选择一个智能体开始对话"}</div>
           </div>
         ) : (
           conversations.map((c) => (
             <div
               key={c.name}
               className={`list-item ${selectedConversation?.name === c.name ? "active" : ""}`}
-              onClick={() => onSelectConversation(c)}
+              onClick={() => !editingName && onSelectConversation(c)}
               role="button"
               tabIndex={0}
               onKeyDown={(e) => {
@@ -152,15 +213,52 @@ export default function Sidebar({
                 }
               }}
             >
-              <div className="list-item-title">
-                <span className="badge-dot" style={{ background: "var(--accent)", width: 7, height: 7 }} />
-                <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {c.title}
-                </span>
-              </div>
-              <div className="list-item-sub">
-                {c.total_messages} 条消息
-              </div>
+              {editingName === c.name ? (
+                <input
+                  className="input"
+                  autoFocus
+                  value={editValue}
+                  onChange={(e) => setEditValue(e.target.value)}
+                  onBlur={() => commitRename(c)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") commitRename(c);
+                    else if (e.key === "Escape") setEditingName(null);
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                />
+              ) : (
+                <>
+                  <div className="list-item-title">
+                    <span className="badge-dot" style={{ background: "var(--accent)", width: 7, height: 7 }} />
+                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {c.title}
+                    </span>
+                  </div>
+                  <div className="list-item-sub">
+                    {c.total_messages} 条消息
+                  </div>
+                  <div className="conv-actions" onClick={(e) => e.stopPropagation()}>
+                    <button
+                      className="btn-ghost"
+                      title={showArchived ? "恢复" : "重命名"}
+                      onClick={() => {
+                        if (showArchived) toggleArchive(c, false);
+                        else { setEditingName(c.name); setEditValue(c.title); }
+                      }}
+                    >
+                      {showArchived ? "↩︎" : "✎"}
+                    </button>
+                    {!showArchived && (
+                      <button className="btn-ghost" title="归档" onClick={() => toggleArchive(c, true)}>
+                        🗂
+                      </button>
+                    )}
+                    <button className="btn-ghost" title="删除" onClick={() => handleDelete(c)}>
+                      🗑
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           ))
         )}
