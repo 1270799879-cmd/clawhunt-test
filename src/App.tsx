@@ -12,6 +12,7 @@ import ConfigDialog from "./components/ConfigDialog";
 import SettingsDialog from "./components/SettingsDialog";
 import MCPDialog from "./components/MCPDialog";
 import OnboardingGuide from "./components/OnboardingGuide";
+import OrchestrationDialog from "./components/OrchestrationDialog";
 
 export default function App() {
   const [loggedIn, setLoggedIn] = useState(false);
@@ -25,6 +26,7 @@ export default function App() {
   const [agentDialogOpen, setAgentDialogOpen] = useState(false);
   const [settingsDialogOpen, setSettingsDialogOpen] = useState(false);
   const [mcpDialogOpen, setMCPDialogOpen] = useState(false);
+  const [orchDialogOpen, setOrchDialogOpen] = useState(false);
   // 首次引导（批次B）
   const [showOnboarding, setShowOnboarding] = useState(false);
 
@@ -55,6 +57,7 @@ export default function App() {
     else if (k === "agents") setAgentDialogOpen(true);
     else if (k === "settings") setSettingsDialogOpen(true);
     else if (k === "mcp") setMCPDialogOpen(true);
+    else if (k === "orchestration") setOrchDialogOpen(true);
   };
 
   if (!loggedIn) {
@@ -102,6 +105,7 @@ export default function App() {
       />
       <SettingsDialog open={settingsDialogOpen} onClose={() => setSettingsDialogOpen(false)} />
       <MCPDialog open={mcpDialogOpen} onClose={() => setMCPDialogOpen(false)} />
+      <OrchestrationDialog open={orchDialogOpen} onClose={() => setOrchDialogOpen(false)} />
       <ConfigDialog />
       {showOnboarding && (
         <OnboardingGuide onClose={() => setShowOnboarding(false)} />
