@@ -10,12 +10,118 @@
 from __future__ import annotations
 
 import json
+import re
 import time
 
 import frappe
 import requests
 
 from frappe import _
+
+
+def _image_meta(image_data):
+    """提取图片 data URL 的脱敏元数据，避免完整 base64 落日志。
+
+    仅对 data URL 或 http(s) URL 返回元数据；其余（空、普通文本）返回 None。
+    """
+    if not image_data or not isinstance(image_data, str):
+        return None
+    if image_data.startswith("data:"):
+        meta = {"length": len(image_data), "kind": "data-url"}
+        try:
+            header = image_data.partition(",")[0]
+            meta["header"] = header
+            meta["mime"] = header[5:header.find(";")] if ";" in header else "unknown"
+            meta["is_b64"] = ";base64," in image_data[: image_data.find(",") + 1] or "base64" in header
+        except Exception:
+            pass
+        return meta
+    if image_data.startswith(("http://", "https://")):
+        return {"length": len(image_data), "kind": "url"}
+    return None
+
+
+_image_logger = None
+
+
+def _get_image_logger():
+    """获取并初始化图片调试 logger（INFO 级别，Frappe 默认是 ERROR 会过滤）。"""
+    global _image_logger
+    if _image_logger is None:
+        _image_logger = frappe.logger("agent_client")
+        _image_logger.setLevel(logging.INFO)
+        for h in _image_logger.handlers:
+            try:
+                h.setLevel(logging.INFO)
+            except Exception:
+                pass
+    return _image_logger
+
+
+def _log_image_debug(tag, **kw):
+    """统一图片调试日志入口（脱敏，不落 base64 内容）。
+
+    用文件 logger 写入 logs/agent_client.log，避免在 LLM 异常、事务回滚时
+    日志随之丢失（frappe.log_error 依赖数据库事务，失败会回滚）。
+    """
+    try:
+        _get_image_logger().info("image-debug tag=%s payload=%s", tag, kw)
+    except Exception:
+        try:
+            frappe.log_error({"tag": tag, **kw}, "image-debug")
+        except Exception:
+            pass
+
+
+def _count_image_parts(content):
+    """统计 OpenAI 风格 content block 中图片块数量。"""
+    if not isinstance(content, list):
+        return 0
+    return sum(1 for b in content if isinstance(b, dict) and b.get("type") == "image_url")
+
+
+def _payload_stats(payload):
+    """统计最终请求 payload 中的图片信息（脱敏，不落 base64 内容）。
+
+    兼容各 provider 的图片承载形态：
+      - OpenAI/Gemini/Anthropic inline data：字符串以 "data:image" 开头
+      - Ollama images 数组：列表元素为 base64 字符串
+      - 纯 base64（无 mime 前缀）：记录数量与总长度
+    """
+    total_b64 = 0
+    image_count = 0
+    bare_b64_count = 0
+    bare_b64_total = 0
+
+    def walk(o):
+        nonlocal total_b64, image_count, bare_b64_count, bare_b64_total
+        if isinstance(o, dict):
+            for v in o.values():
+                if isinstance(v, str) and v.startswith("data:image"):
+                    image_count += 1
+                    total_b64 += len(v)
+                elif isinstance(v, list):
+                    for x in v:
+                        if isinstance(x, str) and x and len(x) > 40 \
+                                and re.fullmatch(r"[A-Za-z0-9+/]+={0,2}", x):
+                            bare_b64_count += 1
+                            bare_b64_total += len(x)
+                        else:
+                            walk(x)
+                else:
+                    walk(v)
+        elif isinstance(o, list):
+            for x in o:
+                walk(x)
+
+    walk(payload)
+    return {
+        "image_count": image_count,
+        "total_b64_chars": total_b64,
+        "bare_b64_count": bare_b64_count,
+        "bare_b64_total_chars": bare_b64_total,
+        "top_keys": list(payload.keys()),
+    }
 
 
 class LLMClientError(Exception):
@@ -116,6 +222,13 @@ class LLMClient:
         """
         role = m.get("role", "user")
         content = m.get("content")
+
+        _log_image_debug("render.start",
+                         provider=self.provider_type,
+                         role=role,
+                         content_kind=("list" if isinstance(content, list)
+                                       else ("str" if isinstance(content, str) else type(content).__name__)),
+                         image_parts=_count_image_parts(content))
 
         if self.provider_type == "Gemini":
             parts = []
@@ -241,6 +354,11 @@ class LLMClient:
         model = model or self.provider.default_model or "gpt-4o-mini"
         payload = self.build_payload(messages, model, temperature, max_tokens, tools)
         url = self._chat_url()
+        _log_image_debug("chat.payload",
+                         provider=self.provider_type,
+                         model=self.model,
+                         url=url,
+                         stats=_payload_stats(payload))
 
         started = time.time()
         try:

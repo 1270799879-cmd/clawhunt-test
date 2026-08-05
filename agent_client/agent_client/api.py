@@ -11,7 +11,13 @@ import frappe
 import requests
 from frappe import _
 
-from agent_client.agent_client.llm_client import LLMClient, LLMClientError
+from agent_client.agent_client.llm_client import (
+    LLMClient,
+    LLMClientError,
+    _image_meta,
+    _log_image_debug,
+    _count_image_parts,
+)
 from agent_client.agent_client.tool_runner import execute_tool, get_tools_schema
 
 
@@ -491,6 +497,14 @@ def send_message(conversation: str, content: str, image_data: str | None = None,
     conv = frappe.get_doc("Conversation", conversation)
     agent = frappe.get_doc("Agent", conv.agent)
 
+    _log_image_debug("send_message.entry",
+                     conversation=conversation,
+                     explicit_model=model,
+                     conv_model=conv.model,
+                     agent_model=agent.model,
+                     has_image=bool(image_data),
+                     image_meta=_image_meta(image_data))
+
     # 1. 保存用户消息（带图时以文本标记占位入库，避免 base64 落库）
     display_content = content + ("\n[附图片]" if image_data else "")
     _append_message(conversation, "user", display_content, agent=agent.name)
@@ -518,9 +532,17 @@ def send_message(conversation: str, content: str, image_data: str | None = None,
     # 4. 调用 LLM（支持工具调用循环）
     provider = conv.llm_provider or agent.llm_provider
     model = model or conv.model or agent.model
+    _log_image_debug("send_message.model_resolved",
+                     provider=provider,
+                     model=model,
+                     image_meta=_image_meta(image_data))
     client = LLMClient(provider)
     tool_used = []
     max_rounds = 5
+    _log_image_debug("send_message.messages_built",
+                     msg_count=len(messages),
+                     has_image=bool(image_data),
+                     image_meta=_image_meta(image_data))
     try:
         for _round in range(max_rounds):
             result = client.chat(
