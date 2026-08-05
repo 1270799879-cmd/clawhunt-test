@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
 import time
 
@@ -93,26 +94,42 @@ def _payload_stats(payload):
     bare_b64_count = 0
     bare_b64_total = 0
 
-    def walk(o):
+    # 图片 base64 一定出现在这些字段名下（各 provider 渲染后）
+    # 注意：这些键可能包裹 dict/list（如 inlineData.data、images[]），
+    # 因此用"图片来源容器"标志沿结构向下传播，而不是用当前键名判断。
+    IMAGE_CONTAINER_KEYS = {"images", "inlineData", "source", "image_url"}
+
+    def walk(o, in_image=False, container=None):
         nonlocal total_b64, image_count, bare_b64_count, bare_b64_total
-        if isinstance(o, dict):
-            for v in o.values():
-                if isinstance(v, str) and v.startswith("data:image"):
-                    image_count += 1
-                    total_b64 += len(v)
-                elif isinstance(v, list):
-                    for x in v:
-                        if isinstance(x, str) and x and len(x) > 40 \
-                                and re.fullmatch(r"[A-Za-z0-9+/]+={0,2}", x):
-                            bare_b64_count += 1
-                            bare_b64_total += len(x)
-                        else:
-                            walk(x)
-                else:
-                    walk(v)
+
+        def log(kind, key, is_img):
+            _log_image_debug("payload_stats.match",
+                             kind=kind, container=container, key=key,
+                             is_img_field=is_img, len=len(o) if isinstance(o, str) else None)
+
+        if isinstance(o, str):
+            if o.startswith("data:image"):
+                image_count += 1
+                total_b64 += len(o)
+                log("data_url", None, True)
+            elif in_image and len(o) > 40 \
+                    and re.fullmatch(r"[A-Za-z0-9+/]+={0,2}", o):
+                image_count += 1
+                total_b64 += len(o)
+                log("image_field_b64", None, True)
+            elif len(o) > 40 and re.fullmatch(r"[A-Za-z0-9+/]+={0,2}", o):
+                bare_b64_count += 1
+                bare_b64_total += len(o)
+                log("bare_b64", None, False)
+        elif isinstance(o, dict):
+            for k, v in o.items():
+                # 若当前键是图片容器，则其内部值都视为图片字段
+                child_img = in_image or (k in IMAGE_CONTAINER_KEYS)
+                walk(v, in_image=child_img,
+                     container=(k if k in IMAGE_CONTAINER_KEYS else container))
         elif isinstance(o, list):
             for x in o:
-                walk(x)
+                walk(x, in_image=in_image, container=container)
 
     walk(payload)
     return {
