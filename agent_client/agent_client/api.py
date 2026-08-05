@@ -19,6 +19,7 @@ from agent_client.agent_client.llm_client import (
     _count_image_parts,
 )
 from agent_client.agent_client.tool_runner import execute_tool, get_tools_schema
+from agent_client.agent_client import orchestration as orch
 
 
 # ======================================================================
@@ -1235,3 +1236,111 @@ def save_persona(agent: str, persona_data: str):
     doc.persona = json.dumps(current, ensure_ascii=False)
     doc.save(ignore_permissions=True)
     return {"ok": True, "name": doc.name, "persona": doc.persona}
+# ======================================================================
+# 组织式编排（Batch B · Task 状态机 + 编排闭环）
+# 设计文档 04/05：GM 拆解 → 成员领取 → 执行 → 质检 → 终审
+# 状态机：pending → claimed → executing → reviewing → approved / rejected(回退 pending)
+# ======================================================================
+@frappe.whitelist()
+def create_channel(channel_name: str, general_manager: str, reviewer: str,
+                   description: str = None, members: list = None):
+    """创建编排频道：指定总经理 + 质检 + 成员列表。"""
+    if frappe.db.exists("Orchestration Channel", channel_name):
+        frappe.throw(_("编排 {0} 已存在").format(channel_name))
+    doc = frappe.new_doc("Orchestration Channel")
+    doc.channel_name = channel_name
+    doc.general_manager = general_manager
+    doc.reviewer = reviewer
+    doc.description = description or ""
+    doc.status = "active"
+    for m in members or []:
+        if frappe.db.exists("Agent", m):
+            doc.append("members", {"agent": m})
+    doc.insert(ignore_permissions=True)
+    return {"ok": True, "name": doc.name, "status": doc.status,
+            "general_manager": doc.general_manager, "reviewer": doc.reviewer}
+
+
+@frappe.whitelist()
+def list_channels():
+    """列出所有编排频道及其任务数。"""
+    channels = frappe.get_all(
+        "Orchestration Channel",
+        fields=["name", "channel_name", "general_manager", "reviewer", "status", "description"],
+        order_by="modified desc",
+    )
+    for c in channels:
+        c["task_count"] = frappe.db.count(
+            "Orchestration Task", filters={"channel": c["name"]})
+    return {"channels": channels}
+
+
+@frappe.whitelist()
+def get_channel(channel: str):
+    """获取单个编排频道详情 + 全部任务。"""
+    doc = orch._get_channel(channel)
+    tasks = frappe.get_all(
+        "Orchestration Task",
+        filters={"channel": channel},
+        fields=["name", "title", "description", "status", "assigned_to",
+                "result", "review_note", "final_note"],
+        order_by="creation asc",
+    )
+    core = {k: doc.get(k) for k in
+            ("name", "channel_name", "general_manager", "reviewer", "status", "description")}
+    return {"channel": core, "tasks": tasks}
+
+
+@frappe.whitelist()
+def decompose_task(channel: str, request: str):
+    """主 Agent（总经理）将诉求拆解为子任务（pending）。"""
+    ch = orch._get_channel(channel)
+    return orch.decompose_with_llm(ch, request)
+
+
+@frappe.whitelist()
+def claim_task(task: str, agent: str):
+    """成员领取任务：pending → claimed。"""
+    doc = orch._get_task(task)
+    if doc.status != orch.STATUS_PENDING:
+        frappe.throw(_("任务 {0} 状态为 {1}，仅 pending 可领取").format(task, doc.status))
+    if not frappe.db.exists("Agent", agent):
+        frappe.throw(_("Agent {0} 不存在").format(agent))
+    doc.assigned_to = agent
+    doc.status = orch.STATUS_CLAIMED
+    doc.save(ignore_permissions=True)
+    return {"ok": True, "name": doc.name, "status": doc.status, "assigned_to": doc.assigned_to}
+
+
+@frappe.whitelist()
+def submit_task(task: str, result: str):
+    """成员提交结果：claimed/executing → reviewing。"""
+    doc = orch._get_task(task)
+    if doc.status not in (orch.STATUS_CLAIMED, orch.STATUS_EXECUTING):
+        frappe.throw(_("任务 {0} 状态为 {1}，仅执行中可提交").format(task, doc.status))
+    doc.result = result
+    doc.status = orch.STATUS_REVIEWING
+    doc.save(ignore_permissions=True)
+    return {"ok": True, "name": doc.name, "status": doc.status}
+
+
+@frappe.whitelist()
+def review_task(task: str, approve: bool, note: str = None):
+    """质检：reviewing → approved；不合规 → rejected 并回退 pending。"""
+    doc = orch._get_task(task)
+    if doc.status != orch.STATUS_REVIEWING:
+        frappe.throw(_("任务 {0} 状态为 {1}，仅 reviewing 可质检").format(task, doc.status))
+    doc.review_note = note or ""
+    from frappe.utils import cint
+    approved = cint(approve) == 1
+    doc.status = orch.STATUS_APPROVED if approved else orch.STATUS_PENDING
+    doc.save(ignore_permissions=True)
+    return {"ok": True, "name": doc.name, "status": doc.status,
+            "review_note": doc.review_note, "approved": approved}
+
+
+@frappe.whitelist()
+def final_review(channel: str):
+    """主 Agent（总经理）终审：全部 approved → channel done；不达标回退 pending。"""
+    ch = orch._get_channel(channel)
+    return orch.final_review_with_llm(ch)

@@ -1,0 +1,105 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "format:OT-{###}",
+ "creation": "2026-08-05 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "channel",
+  "title",
+  "description",
+  "column_break_1",
+  "status",
+  "assigned_to",
+  "result",
+  "section_break_review",
+  "review_note",
+  "final_note"
+ ],
+ "fields": [
+  {
+   "fieldname": "channel",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Channel",
+   "options": "Orchestration Channel",
+   "reqd": 1
+  },
+  {
+   "fieldname": "title",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Title",
+   "reqd": 1
+  },
+  {
+   "fieldname": "description",
+   "fieldtype": "Text",
+   "label": "Description"
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Status",
+   "options": "pending\nclaimed\nexecuting\nreviewing\napproved\nrejected",
+   "default": "pending"
+  },
+  {
+   "fieldname": "assigned_to",
+   "fieldtype": "Link",
+   "label": "Assigned To",
+   "options": "Agent"
+  },
+  {
+   "fieldname": "result",
+   "fieldtype": "Text",
+   "label": "Result"
+  },
+  {
+   "fieldname": "section_break_review",
+   "fieldtype": "Section Break",
+   "label": "Review"
+  },
+  {
+   "fieldname": "review_note",
+   "fieldtype": "Text",
+   "label": "Review Note"
+  },
+  {
+   "fieldname": "final_note",
+   "fieldtype": "Text",
+   "label": "Final Note"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-08-05 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "agent_client",
+ "name": "Orchestration Task",
+ "naming_rule": "Expression",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "track_changes": 1
+}

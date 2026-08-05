@@ -1,0 +1,97 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "field:channel_name",
+ "creation": "2026-08-05 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "channel_name",
+  "general_manager",
+  "reviewer",
+  "column_break_1",
+  "status",
+  "description",
+  "section_break_members",
+  "members"
+ ],
+ "fields": [
+  {
+   "fieldname": "channel_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Channel Name",
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "fieldname": "general_manager",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "General Manager",
+   "options": "Agent",
+   "reqd": 1
+  },
+  {
+   "fieldname": "reviewer",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Reviewer",
+   "options": "Agent",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Status",
+   "options": "active\ndone",
+   "default": "active"
+  },
+  {
+   "fieldname": "description",
+   "fieldtype": "Text",
+   "label": "Description"
+  },
+  {
+   "fieldname": "section_break_members",
+   "fieldtype": "Section Break",
+   "label": "Members"
+  },
+  {
+   "fieldname": "members",
+   "fieldtype": "Table",
+   "label": "Members",
+   "options": "Channel Member"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-08-05 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "agent_client",
+ "name": "Orchestration Channel",
+ "naming_rule": "By fieldname",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "track_changes": 1
+}
