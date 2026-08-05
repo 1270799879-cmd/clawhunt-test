@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 
 import frappe
+import requests
 from frappe import _
 
 from agent_client.agent_client.llm_client import LLMClient, LLMClientError
@@ -100,6 +101,78 @@ def test_provider(provider_name: str):
     """测试 LLM Provider 连接。"""
     client = LLMClient(provider_name)
     return client.test()
+
+
+@frappe.whitelist()
+def fetch_models(provider_name: str):
+    """从 LLM Provider 拉取可用模型列表（按 provider_type 调用对应 /models 端点）。
+
+    参考 HanaAgent 的「连接模型提供商 → 自动拉取模型」体验：
+      - OpenAI / Custom            : GET {base_url}/models   (Bearer)
+      - Anthropic                  : GET {base_url}/v1/models (x-api-key)
+      - Gemini                     : GET {base_url}/models?key=...
+      - Ollama                     : GET {base_url}/api/tags
+    返回 {ok, models: [{model_name, ...}], error?}
+    """
+    client = LLMClient(provider_name)
+    base_url = client.api_base_url
+    ptype = client.provider_type
+    timeout = client.timeout
+    headers = client._headers()
+
+    try:
+        if ptype == "Ollama":
+            url = f"{base_url}/api/tags"
+            resp = requests.get(url, headers=headers, timeout=timeout)
+            if resp.status_code >= 400:
+                return _model_error(ptype, resp)
+            data = resp.json()
+            raw = data.get("models") or []
+            models = [{"model_name": m.get("name") or m.get("model")} for m in raw if m.get("name") or m.get("model")]
+        elif ptype == "Gemini":
+            url = f"{base_url}/models"
+            params = {"key": client.api_key or ""} if client.api_key else None
+            resp = requests.get(url, params=params, headers=headers, timeout=timeout)
+            if resp.status_code >= 400:
+                return _model_error(ptype, resp)
+            raw = resp.json().get("models") or []
+            models = []
+            for m in raw:
+                name = m.get("name") or ""
+                if name.startswith("models/"):
+                    name = name[len("models/"):]
+                if name:
+                    models.append({"model_name": name})
+        else:
+            # OpenAI / Anthropic / Custom：GET {base}/models 或 {base}/v1/models
+            candidates = [f"{base_url}/models"]
+            if ptype == "Anthropic":
+                candidates = [f"{base_url}/v1/models", f"{base_url}/models"]
+            resp = None
+            for url in candidates:
+                resp = requests.get(url, headers=headers, timeout=timeout)
+                if resp.status_code < 400:
+                    break
+            if resp is None or resp.status_code >= 400:
+                return _model_error(ptype, resp)
+            data = resp.json()
+            raw = data.get("data") or []
+            models = [{"model_name": m.get("id") or m.get("model_name")} for m in raw if m.get("id") or m.get("model_name")]
+    except requests.RequestException as e:
+        return {"ok": False, "models": [], "error": _("拉取模型失败: {0}").format(e)}
+    except ValueError:
+        return {"ok": False, "models": [], "error": _("供应商返回了非 JSON 内容")}
+
+    if not models:
+        return {"ok": False, "models": [], "error": _("供应商未返回任何模型")}
+    return {"ok": True, "models": models}
+
+
+def _model_error(ptype, resp):
+    """构造拉取模型错误返回。"""
+    status = resp.status_code if resp is not None else "unknown"
+    detail = resp.text[:200] if resp is not None else ""
+    return {"ok": False, "models": [], "error": _("拉取模型失败 (HTTP {0}): {1}").format(status, detail)}
 
 
 # ======================================================================
