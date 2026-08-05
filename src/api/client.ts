@@ -125,19 +125,25 @@ export const deleteAgent = (name: string) =>
 // ---------- Conversation ----------
 export const newConversation = (title: string, agent: string, user?: string) =>
   request<{ name: string; title: string }>("POST", "new_conversation", { title, agent, user }, true);
-export const listConversations = async (agent?: string): Promise<{ conversations: Conversation[] }> => {
+export const listConversations = async (agent?: string, archived?: number): Promise<{ conversations: Conversation[] }> => {
   const api = window.agentClientDesktop;
   if (api?.apiCall) {
     try {
-      const res = await api.apiCall("GET", `${API_MODULE}.list_conversations`, { agent });
+      const res = await api.apiCall("GET", `${API_MODULE}.list_conversations`, { agent, archived });
       if (res.ok) return (res.data?.message ?? res.data) as { conversations: Conversation[] };
       throw new Error(res.error || `HTTP ${res.status}`);
     } catch (e) {
       console.error("[client] IPC list_conversations 失败，回退 HTTP:", e);
     }
   }
-  return request<{ conversations: Conversation[] }>("GET", "list_conversations", { agent });
+  return request<{ conversations: Conversation[] }>("GET", "list_conversations", { agent, archived });
 };
+export const renameConversation = (conversation: string, title: string) =>
+  request<{ ok: boolean; name: string; title: string }>("POST", "rename_conversation", { conversation, title }, true);
+export const archiveConversation = (conversation: string, archived: boolean) =>
+  request<{ ok: boolean; name: string; status: string }>("POST", "archive_conversation", { conversation, archived: archived ? 1 : 0 }, true);
+export const deleteConversation = (conversation: string) =>
+  request<{ ok: boolean; name: string }>("POST", "delete_conversation", { conversation }, true);
 export const listMessages = (conversation: string) =>
   request<{ messages: ChatMessage[] }>("GET", "list_messages", { conversation });
 export const sendMessage = (conversation: string, content: string, model?: string) =>

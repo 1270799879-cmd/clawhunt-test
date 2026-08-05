@@ -296,6 +296,24 @@ select.input option {
   margin-top: 3px;
 }
 
+/* 会话操作按钮（批次 A） */
+.conv-actions {
+  display: flex;
+  gap: 2px;
+  margin-top: 6px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.list-item:hover .conv-actions,
+.list-item.active .conv-actions {
+  opacity: 1;
+}
+.conv-actions .btn-ghost {
+  padding: 2px 6px;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
 /* 状态徽章 */
 .badge {
   display: inline-flex;
