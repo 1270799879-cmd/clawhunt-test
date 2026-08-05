@@ -7,7 +7,7 @@
 
 export type ViewKey = "memory" | "evolution" | "providers" | "tools" | "conversation";
 
-export type ManagementKey = "providers" | "agents" | "settings" | "mcp";
+export type ManagementKey = "providers" | "agents" | "settings" | "mcp" | "orchestration";
 
 interface NavItem {
   key: string;
@@ -27,6 +27,7 @@ const MANAGE_ITEMS: NavItem[] = [
   { key: "providers", label: "供应商", icon: "⚙️" },
   { key: "agents", label: "智能体", icon: "🤖" },
   { key: "mcp", label: "MCP", icon: "🔌" },
+  { key: "orchestration", label: "编排", icon: "🧩" },
   { key: "settings", label: "设置", icon: "🛡️" },
 ];
 

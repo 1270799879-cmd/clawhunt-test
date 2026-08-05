@@ -1298,7 +1298,7 @@ select.input option {
   max-width: 640px;
 }
 .mgmt-panel-wide {
-  max-width: 760px;
+  max-width: 1000px;
 }
 .form-error {
   padding: 10px 12px;
@@ -1545,5 +1545,263 @@ select.input option {
   .form-grid-2,
   .form-grid-3 {
     grid-template-columns: 1fr;
+  }
+}
+
+/* ============================================================
+   组织式编排看板（Batch B · Task 状态机 + 编排闭环）
+   ============================================================ */
+.orch-body {
+  display: flex;
+  gap: 14px;
+  height: 62vh;
+  min-height: 380px;
+}
+.orch-side {
+  width: 240px;
+  min-width: 240px;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg-2);
+  overflow: hidden;
+}
+.orch-side-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-1);
+  border-bottom: 1px solid var(--border);
+}
+.orch-create {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-3);
+}
+.orch-channel-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+}
+.orch-channel-item {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  margin-bottom: 8px;
+  background: var(--bg-3);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.orch-channel-item:hover {
+  border-color: var(--border-strong);
+}
+.orch-channel-item.active {
+  border-color: var(--accent);
+  background: rgba(56, 189, 248, 0.08);
+}
+.orch-channel-name {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text-0);
+}
+.orch-channel-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  font-size: 11.5px;
+  color: var(--text-2);
+}
+.orch-empty {
+  padding: 20px 10px;
+  text-align: center;
+  color: var(--text-2);
+  font-size: 12.5px;
+}
+.orch-empty-lrg {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  color: var(--text-2);
+  font-size: 14px;
+}
+.orch-board {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg-2);
+  overflow: hidden;
+}
+.orch-board-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.orch-board-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-0);
+}
+.orch-board-meta {
+  font-size: 11.5px;
+  color: var(--text-2);
+  margin-top: 3px;
+}
+.orch-board-actions {
+  display: flex;
+  gap: 8px;
+}
+.orch-decompose {
+  display: flex;
+  gap: 8px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.orch-decompose .input {
+  flex: 1;
+}
+.orch-columns {
+  flex: 1;
+  display: flex;
+  gap: 10px;
+  padding: 12px 14px;
+  overflow-x: auto;
+}
+.orch-col {
+  flex: 1;
+  min-width: 190px;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-3);
+  overflow: hidden;
+}
+.orch-col-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-1);
+  border-bottom: 1px solid var(--border);
+}
+.orch-col-count {
+  font-size: 11px;
+  color: var(--text-2);
+  background: var(--bg-2);
+  border-radius: 8px;
+  padding: 1px 7px;
+}
+.orch-col-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.orch-col-empty {
+  text-align: center;
+  color: var(--text-2);
+  font-size: 12px;
+  padding: 12px 0;
+}
+.orch-task {
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-2);
+}
+.orch-task-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-0);
+  line-height: 1.4;
+}
+.orch-task-assign,
+.orch-task-note {
+  font-size: 11px;
+  color: var(--text-2);
+  margin-top: 4px;
+  line-height: 1.4;
+}
+.orch-task-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+.review-vote {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.review-vote-result {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent);
+}
+.cdate-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.cdate-body .cdate-actions {
+  justify-content: flex-end;
+  margin-top: 4px;
+}
+.btn-sm {
+  padding: 4px 10px;
+  font-size: 12px;
+}
+.btn-block {
+  width: 100%;
+}
+.btn-danger {
+  background: rgba(251, 113, 133, 0.12);
+  border-color: rgba(251, 113, 133, 0.35);
+  color: var(--danger);
+}
+.btn-danger:hover {
+  background: rgba(251, 113, 133, 0.2);
+}
+.tag-blue {
+  background: rgba(56, 189, 248, 0.12);
+  color: var(--accent);
+}
+.tag-green {
+  background: rgba(52, 211, 153, 0.12);
+  color: var(--success);
+}
+.tag {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 6px;
+}
+
+@media (max-width: 900px) {
+  .orch-body {
+    flex-direction: column;
+    height: auto;
+  }
+  .orch-side {
+    width: 100%;
+    min-width: 0;
+    max-height: 220px;
   }
 }

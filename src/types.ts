@@ -236,3 +236,71 @@ export interface MCPTool {
 export interface MCPServerDetail extends MCPServer {
   tools: MCPTool[];
 }
+
+// ============================================================
+// 组织式编排（Batch B · Task 状态机 + 编排闭环）
+// ============================================================
+export type OrchestrationTaskStatus =
+  | "pending"
+  | "claimed"
+  | "executing"
+  | "reviewing"
+  | "approved"
+  | "rejected";
+
+export interface OrchestrationChannel {
+  name: string;
+  channel_name: string;
+  general_manager: string;
+  reviewer: string;
+  status: string;
+  description: string;
+  task_count: number;
+}
+
+export interface OrchestrationTask {
+  name: string;
+  title: string;
+  description: string;
+  status: OrchestrationTaskStatus;
+  assigned_to: string | null;
+  result: string | null;
+  review_note: string | null;
+  final_note: string | null;
+}
+
+export interface OrchestrationChannelDetail {
+  channel: {
+    name: string;
+    channel_name: string;
+    general_manager: string;
+    reviewer: string;
+    status: string;
+    description: string;
+  };
+  tasks: OrchestrationTask[];
+}
+
+export interface DecomposeResult {
+  ok: boolean;
+  channel: string;
+  tasks: { name: string; title: string; status: string }[];
+  tokens?: number;
+  latency_ms?: number;
+  raw?: string;
+}
+
+export interface ReviewResult {
+  ok: boolean;
+  name: string;
+  status: string;
+  review_note: string;
+  approved: boolean;
+}
+
+export interface FinalReviewResult {
+  ok: boolean;
+  passed: boolean;
+  channel: string;
+  note: string;
+}

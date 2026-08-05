@@ -8,15 +8,20 @@ import type {
   AgentDetail,
   ChatMessage,
   Conversation,
+  DecomposeResult,
   EvolutionMetric,
   EvolutionRecord,
+  FinalReviewResult,
   LLMProvider,
   MCPServer,
   MCPServerDetail,
   MCPTool,
   MemoryEntry,
   OnboardingState,
+  OrchestrationChannel,
+  OrchestrationChannelDetail,
   ProviderDetail,
+  ReviewResult,
   RuntimeMetrics,
   ToolDefinition,
 } from "../types";
@@ -251,3 +256,27 @@ export const savePersona = (agent: string, personaData: Record<string, unknown>)
     { agent, persona_data: JSON.stringify(personaData) },
     true
   );
+
+// ---------- 组织式编排（Batch B · Task 状态机 + 编排闭环） ----------
+export const listChannels = () =>
+  request<{ channels: OrchestrationChannel[] }>("GET", "list_channels");
+export const getChannel = (channel: string) =>
+  request<OrchestrationChannelDetail>("GET", "get_channel", { channel });
+export const createChannel = (channelName: string, generalManager: string, reviewer: string, description?: string, members?: string[]) =>
+  request<{ ok: boolean; name: string; status: string; general_manager: string; reviewer: string }>(
+    "POST",
+    "create_channel",
+    { channel_name: channelName, general_manager: generalManager, reviewer, description, members }
+  );
+export const decomposeTask = (channel: string, requestText: string) =>
+  request<DecomposeResult>("POST", "decompose_task", { channel, request: requestText });
+export const claimTask = (task: string, agent: string) =>
+  request<{ ok: boolean; name: string; status: string; assigned_to: string }>(
+    "POST", "claim_task", { task, agent }
+  );
+export const submitTask = (task: string, result: string) =>
+  request<{ ok: boolean; name: string; status: string }>("POST", "submit_task", { task, result });
+export const reviewTask = (task: string, approve: boolean, note?: string) =>
+  request<ReviewResult>("POST", "review_task", { task, approve: approve ? 1 : 0, note });
+export const finalReview = (channel: string) =>
+  request<FinalReviewResult>("POST", "final_review", { channel });
