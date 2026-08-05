@@ -234,11 +234,20 @@ export const getOnboardingState = () =>
 export const completeOnboarding = () =>
   request<OnboardingState>("POST", "complete_onboarding");
 
-// ---------- 角色卡 / 人设卡（批次B） ----------
+// ---------- 角色卡 / 人设卡（批次B + 批次A） ----------
 export const savePersonaCard = (agent: string, personaData: Record<string, unknown>) =>
   request<{ ok: boolean; name: string; persona: string }>(
     "POST",
     "save_persona_card",
+    { agent, persona_data: JSON.stringify(personaData) },
+    true
+  );
+
+// 批次A：三段式 persona 保存（identity / ishiki / public-ishiki + yuan + role）
+export const savePersona = (agent: string, personaData: Record<string, unknown>) =>
+  request<{ ok: boolean; name: string; persona: string }>(
+    "POST",
+    "save_persona",
     { agent, persona_data: JSON.stringify(personaData) },
     true
   );

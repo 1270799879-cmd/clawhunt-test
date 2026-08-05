@@ -6,7 +6,7 @@
 // ============================================================
 import { useEffect, useState } from "react";
 import type { Agent, AgentDetail, AgentTool, LLMProvider, ToolDefinition, PersonaCard } from "../types";
-import { parsePersona, serializePersona } from "../types";
+import { parsePersona, serializePersona, YUAN_OPTIONS, ROLE_OPTIONS } from "../types";
 import {
   deleteAgent,
   getAgent,
@@ -72,6 +72,11 @@ const EMPTY_CARD: PersonaCard = {
   summary: "",
   tone_example: "",
   system_prompt: "",
+  identity: "",
+  ishiki: "",
+  publicIshiki: "",
+  yuan: "",
+  role: "",
 };
 
 const implLabel = (impl: string) =>
@@ -528,6 +533,70 @@ export default function AgentDialog({ open, onClose, onChanged }: Props) {
                       onChange={(e) => setPersonaCard((c) => ({ ...c, summary: e.target.value }))}
                       placeholder="一句话概括这个角色的性格与专长"
                     />
+                  </div>
+
+                  <div className="form-grid-2">
+                    <div className="form-group">
+                      <label className="form-label">yuan 底座（表达机制）</label>
+                      <select
+                        className="input"
+                        value={personaCard.yuan}
+                        onChange={(e) => setPersonaCard((c) => ({ ...c, yuan: e.target.value }))}
+                      >
+                        <option value="">未选择</option>
+                        {YUAN_OPTIONS.map((y) => (
+                          <option key={y} value={y}>{y}</option>
+                        ))}
+                      </select>
+                      <div className="field-hint">hanako·MOOD / butter·PULSE / ming·沉思 / kong·无独白</div>
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">编排角色（role）</label>
+                      <select
+                        className="input"
+                        value={personaCard.role}
+                        onChange={(e) => setPersonaCard((c) => ({ ...c, role: e.target.value }))}
+                      >
+                        <option value="">普通成员</option>
+                        {ROLE_OPTIONS.map((r) => (
+                          <option key={r} value={r}>{r}</option>
+                        ))}
+                      </select>
+                      <div className="field-hint">general_manager·总经理 / reviewer·质检 / member·成员</div>
+                    </div>
+                  </div>
+
+                  <div className="persona-three-layer">
+                    <div className="form-group">
+                      <label className="form-label">身份（identity · 他是谁）</label>
+                      <textarea
+                        className="input textarea"
+                        rows={2}
+                        value={personaCard.identity}
+                        onChange={(e) => setPersonaCard((c) => ({ ...c, identity: e.target.value }))}
+                        placeholder="几行身份速写。性格、台词、原则不写在这里。"
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">人格主文件（ishiki · 怎样想/怎样说）</label>
+                      <textarea
+                        className="input textarea"
+                        rows={3}
+                        value={personaCard.ishiki}
+                        onChange={(e) => setPersonaCard((c) => ({ ...c, ishiki: e.target.value }))}
+                        placeholder="性格三层、语言指纹、原则、表达约束——人格的核心。"
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">对外人格（public-ishiki · 可选）</label>
+                      <textarea
+                        className="input textarea"
+                        rows={2}
+                        value={personaCard.publicIshiki}
+                        onChange={(e) => setPersonaCard((c) => ({ ...c, publicIshiki: e.target.value }))}
+                        placeholder="接待外部访客时的人格与边界（可选但推荐）。"
+                      />
+                    </div>
                   </div>
 
                   <div className="form-group">
