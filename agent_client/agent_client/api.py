@@ -334,11 +334,24 @@ def new_conversation(title: str, agent: str, user: str | None = None):
 
 
 @frappe.whitelist()
-def list_conversations(agent: str | None = None):
-    """列出会话。"""
+def list_conversations(agent: str | None = None, archived: int | str | None = 0):
+    """列出会话。
+
+    archived: 0=仅未归档（默认），1=仅已归档（status=Archived）。
+    注意 URL 查询参数经 Frappe 传入为字符串，需严格解析为整数，
+    否则字符串 "0" 会被当作 truthy 误走归档分支。
+    """
+    try:
+        archived = int(archived)
+    except (TypeError, ValueError):
+        archived = 0
     filters = {}
     if agent:
         filters["agent"] = agent
+    if archived:
+        filters["status"] = "Archived"
+    else:
+        filters["status"] = ["!=", "Archived"]
     conversations = frappe.get_all(
         "Conversation",
         filters=filters,
@@ -346,6 +359,61 @@ def list_conversations(agent: str | None = None):
         order_by="creation desc",
     )
     return {"conversations": conversations}
+
+
+@frappe.whitelist()
+def rename_conversation(conversation: str, title: str):
+    """重命名会话。"""
+    if not title or not title.strip():
+        frappe.throw(_("标题不能为空"))
+    if not frappe.db.exists("Conversation", conversation):
+        frappe.throw(_("会话 {0} 不存在").format(conversation))
+    doc = frappe.get_doc("Conversation", conversation)
+    doc.title = title.strip()
+    doc.save(ignore_permissions=True)
+    return {"ok": True, "name": doc.name, "title": doc.title}
+
+
+@frappe.whitelist()
+def archive_conversation(conversation: str, archived: int | str | None = 1):
+    """归档 / 恢复会话（复用 status 字段的 Archived 状态）。
+
+    注意表单参数经 Frappe 传入为字符串，需严格解析为整数，
+    否则字符串 "0" 会被当作 truthy 误判为归档。
+    """
+    try:
+        archived = int(archived)
+    except (TypeError, ValueError):
+        archived = 1
+    if not frappe.db.exists("Conversation", conversation):
+        frappe.throw(_("会话 {0} 不存在").format(conversation))
+    doc = frappe.get_doc("Conversation", conversation)
+    doc.status = "Archived" if archived else "Active"
+    doc.save(ignore_permissions=True)
+    return {"ok": True, "name": doc.name, "status": doc.status}
+
+
+@frappe.whitelist()
+def delete_conversation(conversation: str):
+    """删除会话并级联删除其消息。"""
+    if not frappe.db.exists("Conversation", conversation):
+        frappe.throw(_("会话 {0} 不存在").format(conversation))
+    conv = frappe.get_doc("Conversation", conversation)
+    agent_name = conv.agent
+
+    # 级联删除消息
+    frappe.db.delete("Conversation Message", {"conversation": conversation})
+
+    # 删除会话
+    frappe.delete_doc("Conversation", conversation, ignore_permissions=True)
+
+    # 回扣 Agent 会话统计
+    if agent_name and frappe.db.exists("Agent", agent_name):
+        agent_doc = frappe.get_doc("Agent", agent_name)
+        agent_doc.total_conversations = max((agent_doc.total_conversations or 1) - 1, 0)
+        agent_doc.save(ignore_permissions=True)
+
+    return {"ok": True, "name": conversation}
 
 
 def _append_message(conversation, role, content, tokens=None, latency_ms=None, agent=None, tools_used=None):
