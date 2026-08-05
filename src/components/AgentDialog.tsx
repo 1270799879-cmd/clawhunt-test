@@ -253,6 +253,16 @@ export default function AgentDialog({ open, onClose, onChanged }: Props) {
     });
   };
 
+  // 批量绑定/解绑某分类下的全部工具（技能管理面板·上下文管理）
+  const toggleCategory = (tools: ToolDefinition[], on: boolean) => {
+    setForm((f) => {
+      const keep = f.tools.filter((x) => !tools.some((t) => t.name === x.tool));
+      if (!on) return { ...f, tools: keep };
+      const add = tools.map((t) => ({ tool: t.name, tool_name: t.tool_name, enabled: true }));
+      return { ...f, tools: [...keep, ...add] };
+    });
+  };
+
   const isToolBound = (t: ToolDefinition) =>
     form.tools.some((x) => x.tool === t.name);
 
@@ -595,22 +605,56 @@ export default function AgentDialog({ open, onClose, onChanged }: Props) {
                 </div>
               ) : (
                 <div className="tool-bind-list">
-                  {Object.entries(toolCategories).map(([cat, tools]) => (
-                    <div key={cat} className="tool-bind-group">
-                      <div className="tool-bind-cat">{cat}</div>
-                      {tools.map((t) => (
-                        <label key={t.name} className={`tool-bind-row ${isToolBound(t) ? "bound" : ""}`}>
-                          <input
-                            type="checkbox"
-                            checked={isToolBound(t)}
-                            onChange={(e) => toggleTool(t, e.target.checked)}
-                          />
-                          <span className="tool-bind-name">🛠️ {t.tool_name}</span>
-                          <span className="tool-bind-impl">{implLabel(t.implementation_type)}</span>
-                        </label>
-                      ))}
-                    </div>
-                  ))}
+                  {Object.entries(toolCategories).map(([cat, tools]) => {
+                    const boundCount = tools.filter((t) => isToolBound(t)).length;
+                    const allBound = boundCount === tools.length;
+                    return (
+                      <div key={cat} className="tool-bind-group">
+                        <div className="tool-bind-cat">
+                          <span>{cat}</span>
+                          <span className="tool-bind-cat-actions">
+                            <button
+                              type="button"
+                              className="tool-bind-batch"
+                              disabled={allBound}
+                              onClick={() => toggleCategory(tools, true)}
+                            >
+                              全选
+                            </button>
+                            <button
+                              type="button"
+                              className="tool-bind-batch"
+                              disabled={boundCount === 0}
+                              onClick={() => toggleCategory(tools, false)}
+                            >
+                              清空
+                            </button>
+                          </span>
+                        </div>
+                        {tools.map((t) => (
+                          <label key={t.name} className={`tool-bind-row ${isToolBound(t) ? "bound" : ""}`}>
+                            <input
+                              type="checkbox"
+                              checked={isToolBound(t)}
+                              onChange={(e) => toggleTool(t, e.target.checked)}
+                            />
+                            <span className="tool-bind-name" title={t.description}>
+                              🛠️ {t.tool_name}
+                            </span>
+                            <span className="tool-bind-meta" title={t.description}>
+                              {typeof t.usage_count === "number" && t.usage_count > 0
+                                ? `${t.usage_count} 次使用`
+                                : "未使用"}
+                              {typeof t.success_rate === "number" && t.success_rate > 0
+                                ? ` · ${t.success_rate}% 成功`
+                                : ""}
+                            </span>
+                            <span className="tool-bind-impl">{implLabel(t.implementation_type)}</span>
+                          </label>
+                        ))}
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>

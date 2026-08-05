@@ -482,6 +482,61 @@ select.input option {
   min-height: 44px;
   line-height: 1.5;
 }
+.composer-left {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+  flex: 1;
+  min-width: 0;
+}
+.composer-left textarea {
+  flex: 1;
+}
+.composer-img-btn {
+  padding: 0;
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  font-size: 18px;
+  border-radius: 10px;
+}
+.composer-img-btn:hover {
+  background: var(--bg-3);
+}
+.composer-img-preview {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  flex-shrink: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  overflow: hidden;
+  animation: fadeIn 0.2s ease;
+}
+.composer-img-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.composer-img-remove {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(5, 7, 13, 0.8);
+  color: #fff;
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+.composer-img-remove:hover {
+  background: var(--danger);
+}
 
 /* 模型切换下拉（P0 优化：一级入口） - 视觉强化 */
 .model-selector {
@@ -1406,6 +1461,33 @@ select.input option {
   letter-spacing: 0.5px;
   text-transform: uppercase;
   color: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.tool-bind-cat-actions {
+  display: flex;
+  gap: 4px;
+}
+.tool-bind-batch {
+  padding: 1px 8px;
+  font-size: 11px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg-3);
+  color: var(--text-1);
+  cursor: pointer;
+  transition: all 0.15s;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.tool-bind-batch:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.tool-bind-batch:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 .tool-bind-row {
   display: flex;
@@ -1431,6 +1513,14 @@ select.input option {
   flex: 1;
   font-size: 13px;
   color: var(--text-0);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tool-bind-meta {
+  font-size: 11px;
+  color: var(--text-2);
+  white-space: nowrap;
 }
 .tool-bind-impl {
   font-size: 11px;
