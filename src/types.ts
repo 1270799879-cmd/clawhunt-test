@@ -240,6 +240,25 @@ export interface MCPServerDetail extends MCPServer {
 // ============================================================
 // 组织式编排（Batch B · Task 状态机 + 编排闭环）
 // ============================================================
+
+// 编排角色模板（Batch C）：内置总经理 / 质检 / 成员
+export interface RoleTemplate {
+  key: string;
+  label: string;
+  description: string;
+  yuan: string;
+  role: string;
+  name: string;
+  avatar: string;
+  tags: string[];
+  identity: string;
+  ishiki: string;
+  publicIshiki: string;
+  summary: string;
+  system_prompt: string;
+  tools: string[];
+}
+
 export type OrchestrationTaskStatus =
   | "pending"
   | "claimed"

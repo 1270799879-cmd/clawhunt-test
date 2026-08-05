@@ -198,7 +198,13 @@ export default function OrchestrationDialog({ open, onClose }: Props) {
       setActionType(null);
       await refreshDetail(chName);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "操作失败");
+      const msg = e instanceof Error ? e.message : "操作失败";
+      setError(msg);
+      // 领取并发冲突：刷新看板，让任务显示实际承接人，避免误导
+      if (actionType === "claim" && detail) {
+        void refreshDetail(detail.channel.channel_name);
+        showToast("领取冲突：任务已被他人承接，已刷新看板");
+      }
     } finally {
       setBusy(false);
     }

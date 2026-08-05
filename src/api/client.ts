@@ -22,6 +22,7 @@ import type {
   OrchestrationChannelDetail,
   ProviderDetail,
   ReviewResult,
+  RoleTemplate,
   RuntimeMetrics,
   ToolDefinition,
 } from "../types";
@@ -280,3 +281,6 @@ export const reviewTask = (task: string, approve: boolean, note?: string) =>
   request<ReviewResult>("POST", "review_task", { task, approve: approve ? 1 : 0, note });
 export const finalReview = (channel: string) =>
   request<FinalReviewResult>("POST", "final_review", { channel });
+// 编排角色模板（Batch C）：内置总经理 / 质检 / 成员，供一键应用
+export const listRoleTemplates = () =>
+  request<{ ok: boolean; templates: RoleTemplate[] }>("GET", "list_role_templates");

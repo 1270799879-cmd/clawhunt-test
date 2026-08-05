@@ -5,13 +5,14 @@
 //   工具绑定用勾选列表并标注来源（内置 / 函数 / HTTP / MCP）
 // ============================================================
 import { useEffect, useState } from "react";
-import type { Agent, AgentDetail, AgentTool, LLMProvider, ToolDefinition, PersonaCard } from "../types";
+import type { Agent, AgentDetail, AgentTool, LLMProvider, RoleTemplate, ToolDefinition, PersonaCard } from "../types";
 import { parsePersona, serializePersona, YUAN_OPTIONS, ROLE_OPTIONS } from "../types";
 import {
   deleteAgent,
   getAgent,
   listAgents,
   listProviders,
+  listRoleTemplates,
   listTools,
   saveAgent,
   savePersonaCard,
@@ -97,6 +98,9 @@ export default function AgentDialog({ open, onClose, onChanged }: Props) {
   const [personaCard, setPersonaCard] = useState<PersonaCard>(EMPTY_CARD);
   // 旧版纯文本人设（当 persona 不是 JSON 时，作为兼容展示+可切换）
   const [legacyPersona, setLegacyPersona] = useState("");
+  // 编排角色模板（批次C）：内置总经理 / 质检 / 成员，一键套用
+  const [roleTemplates, setRoleTemplates] = useState<RoleTemplate[]>([]);
+  const [appliedTemplate, setAppliedTemplate] = useState("");
 
   const showToast = (msg: string) => {
     setToast(msg);
@@ -129,12 +133,47 @@ export default function AgentDialog({ open, onClose, onChanged }: Props) {
     }
   };
 
+  const loadRoleTemplates = async () => {
+    try {
+      const res = await listRoleTemplates();
+      setRoleTemplates(res.templates || []);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  // 一键套用编排角色模板：填充三段式人设 + 系统提示词 + 推荐工具绑定
+  const applyRoleTemplate = (tpl: RoleTemplate) => {
+    setLegacyPersona("");
+    setPersonaCard({
+      avatar: tpl.avatar || "",
+      name: tpl.name || "",
+      tags: tpl.tags || [],
+      summary: tpl.summary || "",
+      tone_example: "",
+      system_prompt: tpl.system_prompt || "",
+      identity: tpl.identity || "",
+      ishiki: tpl.ishiki || "",
+      publicIshiki: tpl.publicIshiki || "",
+      yuan: tpl.yuan || "",
+      role: tpl.role || "",
+    });
+    setForm((f) => ({
+      ...f,
+      system_prompt: tpl.system_prompt || f.system_prompt,
+      tools: (tpl.tools || []).map((tool) => ({ tool, tool_name: tool, enabled: true })),
+    }));
+    setAppliedTemplate(tpl.key);
+    showToast(`已套用「${tpl.label}」角色模板`);
+  };
+
   useEffect(() => {
     if (open) {
       setMode("list");
       setError("");
       void load();
       void loadTools();
+      void loadRoleTemplates();
     } else {
       setForm(EMPTY_FORM);
     }
@@ -146,6 +185,9 @@ export default function AgentDialog({ open, onClose, onChanged }: Props) {
       llm_provider: providers[0]?.name || "",
       model: providers[0]?.default_model || "",
     });
+    setPersonaCard(EMPTY_CARD);
+    setLegacyPersona("");
+    setAppliedTemplate("");
     setError("");
     setMode("form");
   };
@@ -609,6 +651,46 @@ export default function AgentDialog({ open, onClose, onChanged }: Props) {
                       placeholder="例如：回答尽量言简意赅，多用数据说话。"
                     />
                   </div>
+                </div>
+              )}
+            </div>
+
+            {/* 编排角色模板（批次C）：一键套用人设 + 系统提示词 + 推荐工具 */}
+            <div className="form-group">
+              <div className="form-label" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span>编排角色模板（一键套用）</span>
+                <span className="list-item-sub" style={{ fontSize: 11 }}>总经理 / 质检 / 成员 · 填充人设并绑定推荐工具</span>
+              </div>
+              {roleTemplates.length === 0 ? (
+                <div className="empty" style={{ padding: 12 }}>
+                  <div style={{ fontSize: 12 }}>暂无编排角色模板</div>
+                </div>
+              ) : (
+                <div className="role-template-grid">
+                  {roleTemplates.map((tpl) => (
+                    <div key={tpl.key} className={`role-template-card ${appliedTemplate === tpl.key ? "active" : ""}`}>
+                      <div className="role-template-head">
+                        <span className="role-template-avatar">{tpl.avatar || "🤖"}</span>
+                        <div style={{ flex: 1 }}>
+                          <div className="role-template-name">{tpl.label}</div>
+                          <div className="role-template-tags">
+                            {(tpl.tags || []).map((tg) => (
+                              <span key={tg} className="tag tag-blue">{tg}</span>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="role-template-desc">{tpl.description}</div>
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-block"
+                        disabled={appliedTemplate === tpl.key}
+                        onClick={() => applyRoleTemplate(tpl)}
+                      >
+                        {appliedTemplate === tpl.key ? "已套用" : "套用模板"}
+                      </button>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
