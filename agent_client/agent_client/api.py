@@ -265,11 +265,42 @@ def delete_agent(agent: str):
 # ======================================================================
 # 对话
 # ======================================================================
+def _persona_text(persona):
+    """把 persona 转成可读文本。兼容两种形态：
+    1. 旧版纯文本字符串
+    2. 新版结构化 JSON（avatar/name/tags/summary/tone_example/system_prompt）
+    """
+    if not persona:
+        return ""
+    text = persona.strip()
+    if not (text.startswith("{") and text.endswith("}")):
+        return text
+    try:
+        data = json.loads(text)
+    except (ValueError, TypeError):
+        return text
+    if not isinstance(data, dict):
+        return text
+    parts = []
+    if data.get("name"):
+        parts.append(f"角色：{data['name']}")
+    if data.get("summary"):
+        parts.append(data["summary"])
+    if data.get("tags"):
+        parts.append(f"标签：{'、'.join(data['tags'])}")
+    if data.get("tone_example"):
+        parts.append(f"语气示例：{data['tone_example']}")
+    if data.get("system_prompt"):
+        parts.append(f"行为准则：{data['system_prompt']}")
+    return "\n".join(parts)
+
+
 def _build_system_messages(agent):
     """根据 Agent 配置构造 system prompt。"""
     system_parts = []
-    if agent.persona:
-        system_parts.append(f"【人设】\n{agent.persona}")
+    persona_text = _persona_text(getattr(agent, "persona", None))
+    if persona_text:
+        system_parts.append(f"【人设】\n{persona_text}")
     if agent.system_prompt:
         system_parts.append(f"【系统指令】\n{agent.system_prompt}")
     if not system_parts:
@@ -994,3 +1025,78 @@ def test_mcp_server(server_name: str):
         "error": result.get("error"),
         "name": doc.name,
     }
+
+
+# ======================================================================
+# 首次使用引导（批次B）
+# ======================================================================
+def _get_current_user():
+    """返回当前登录用户（Frappe 会话自带的 user）。"""
+    user = frappe.session.user or "Administrator"
+    if user == "Guest":
+        user = "Administrator"
+    return user
+
+
+def _get_user_profile(user):
+    """获取用户画像记录，不存在则创建。"""
+    if frappe.db.exists("User Profile", user):
+        return frappe.get_doc("User Profile", user)
+    doc = frappe.new_doc("User Profile")
+    doc.user = user
+    doc.onboarded = 0
+    doc.insert(ignore_permissions=True)
+    return doc
+
+
+@frappe.whitelist()
+def get_onboarding_state():
+    """返回当前用户是否已完成首次引导。"""
+    user = _get_current_user()
+    profile = _get_user_profile(user)
+    return {"ok": True, "user": user, "onboarded": bool(profile.onboarded)}
+
+
+@frappe.whitelist()
+def complete_onboarding():
+    """标记当前用户已完成首次引导。"""
+    user = _get_current_user()
+    profile = _get_user_profile(user)
+    profile.onboarded = 1
+    profile.save(ignore_permissions=True)
+    return {"ok": True, "user": user, "onboarded": True}
+
+
+# ======================================================================
+# 角色卡 / 人设卡（批次B）
+# ======================================================================
+@frappe.whitelist()
+def save_persona_card(agent: str, persona_data: str):
+    """保存结构化的角色卡 / 人设卡 JSON 到 Agent 的 persona 字段。
+
+    persona_data 为 JSON 字符串，形如：
+      {"avatar":"🤖","name":"数据分析师","tags":["专业","耐心"],
+       "summary":"...","tone_example":"...","system_prompt":"..."}
+    """
+    if not frappe.db.exists("Agent", agent):
+        frappe.throw(_("Agent {0} 不存在").format(agent))
+    try:
+        data = json.loads(persona_data)
+        if not isinstance(data, dict):
+            raise ValueError("persona_data must be object")
+    except (ValueError, TypeError) as e:
+        frappe.throw(_("人设卡片数据格式有误: {0}").format(e))
+
+    # 仅保存我们关心的字段，避免脏数据
+    clean = {
+        "avatar": str(data.get("avatar") or ""),
+        "name": str(data.get("name") or ""),
+        "tags": [str(t) for t in (data.get("tags") or [])][:10],
+        "summary": str(data.get("summary") or ""),
+        "tone_example": str(data.get("tone_example") or ""),
+        "system_prompt": str(data.get("system_prompt") or ""),
+    }
+    doc = frappe.get_doc("Agent", agent)
+    doc.persona = json.dumps(clean, ensure_ascii=False)
+    doc.save(ignore_permissions=True)
+    return {"ok": True, "name": doc.name, "persona": doc.persona}

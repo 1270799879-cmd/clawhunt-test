@@ -11,6 +11,7 @@ import frappe
 from frappe import _
 
 from agent_client.agent_client.llm_client import LLMClient, LLMClientError
+from agent_client.agent_client.api import _persona_text
 
 
 @frappe.whitelist()
@@ -29,8 +30,9 @@ def run_agent_task(agent: str, task: str, context: str | None = None):
 
     # 构造系统提示词
     system_parts = []
-    if agent_doc.persona:
-        system_parts.append(f"【人设】\n{agent_doc.persona}")
+    persona_text = _persona_text(agent_doc.persona)
+    if persona_text:
+        system_parts.append(f"【人设】\n{persona_text}")
     if agent_doc.system_prompt:
         system_parts.append(f"【系统指令】\n{agent_doc.system_prompt}")
     system_parts.append(f"【任务】\n{task}")
