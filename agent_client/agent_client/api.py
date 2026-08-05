@@ -483,7 +483,7 @@ def list_messages(conversation: str):
 
 
 @frappe.whitelist()
-def send_message(conversation: str, content: str):
+def send_message(conversation: str, content: str, image_data: str | None = None, model: str | None = None):
     """发送用户消息并获取 Agent 回复（支持工具调用）。"""
     if not frappe.db.exists("Conversation", conversation):
         frappe.throw(_("会话 {0} 不存在").format(conversation))
@@ -491,22 +491,33 @@ def send_message(conversation: str, content: str):
     conv = frappe.get_doc("Conversation", conversation)
     agent = frappe.get_doc("Agent", conv.agent)
 
-    # 1. 保存用户消息
-    _append_message(conversation, "user", content, agent=agent.name)
+    # 1. 保存用户消息（带图时以文本标记占位入库，避免 base64 落库）
+    display_content = content + ("\n[附图片]" if image_data else "")
+    _append_message(conversation, "user", display_content, agent=agent.name)
 
     # 2. 构造完整消息列表
     messages = _build_system_messages(agent)
     memory_ctx = _load_memory_context(agent)
     if memory_ctx:
         messages.append({"role": "system", "content": memory_ctx})
-    messages.extend(_get_recent_history(conv, agent))
+    history = _get_recent_history(conv, agent)
+    # 若本条用户消息带图，将历史中当前消息替换为含图片的 content block
+    if image_data and history:
+        history[-1] = {
+            "role": "user",
+            "content": [
+                {"type": "text", "text": content},
+                {"type": "image_url", "image_url": {"url": image_data}},
+            ],
+        }
+    messages.extend(history)
 
     # 3. 加载 Agent 启用的工具
     tools = get_tools_schema(agent.name)
 
     # 4. 调用 LLM（支持工具调用循环）
     provider = conv.llm_provider or agent.llm_provider
-    model = conv.model or agent.model
+    model = model or conv.model or agent.model
     client = LLMClient(provider)
     tool_used = []
     max_rounds = 5

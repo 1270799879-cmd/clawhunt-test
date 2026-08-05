@@ -2,6 +2,9 @@
 
 所有提供商都通过 HTTP 请求调用，避免引入额外的 SDK 依赖，
 这样在 Frappe 的受限环境中也能稳定工作。
+
+批次C：支持多模态（图片）消息。content 可为字符串或 OpenAI 风格 content block
+列表，_render_message 负责按供应商转换为对应格式。
 """
 
 from __future__ import annotations
@@ -44,8 +47,31 @@ class LLMClient:
         if self.provider_type == "Gemini":
             url = f"{self.api_base_url or 'https://generativelanguage.googleapis.com/v1beta'}"
             return f"{url}/models/{self.model}:generateContent"
-        # OpenAI / Anthropic / Custom 默认走 OpenAI 兼容 /chat/completions
         return f"{self.api_base_url}/chat/completions"
+
+    def _headers(self) -> dict:
+        """构造各提供商的请求头。
+
+          - OpenAI / Custom : Authorization: Bearer <key>
+          - Anthropic       : x-api-key + anthropic-version
+          - Gemini          : 密钥走查询参数 (?key=)，此处仅声明 JSON
+          - Ollama          : 本地服务，通常无需认证
+        """
+        base = {"Content-Type": "application/json"}
+        if self.provider_type == "Anthropic":
+            return {
+                "content-type": "application/json",
+                "x-api-key": self.api_key or "",
+                "anthropic-version": "2023-06-01",
+            }
+        if self.provider_type == "Gemini":
+            return base
+        if self.provider_type == "Ollama":
+            return base
+        # OpenAI / Custom
+        if self.api_key:
+            base["Authorization"] = f"Bearer {self.api_key}"
+        return base
 
     def build_payload(self, messages: list[dict], model: str, temperature: float | None,
                       max_tokens: int | None, tools: list | None = None) -> dict:
@@ -56,7 +82,7 @@ class LLMClient:
         if self.provider_type == "Ollama":
             payload = {
                 "model": model,
-                "messages": messages,
+                "messages": [self._render_message(m) for m in messages],
                 "stream": False,
                 "options": {"temperature": temperature, "num_predict": max_tokens},
             }
@@ -65,16 +91,12 @@ class LLMClient:
             return payload
         if self.provider_type == "Gemini":
             return {
-                "contents": [
-                    {"role": "user" if m["role"] == "user" else "model", "parts": [{"text": m["content"]}]}
-                    for m in messages
-                    if m.get("content")
-                ],
+                "contents": [self._render_message(m) for m in messages if m.get("content")],
                 "generationConfig": {"temperature": temperature, "maxOutputTokens": max_tokens},
             }
         payload = {
             "model": model,
-            "messages": messages,
+            "messages": [self._render_message(m) for m in messages],
             "temperature": temperature,
             "max_tokens": max_tokens,
         }
@@ -82,18 +104,76 @@ class LLMClient:
             payload["tools"] = tools
         return payload
 
-    def _headers(self) -> dict:
-        if self.provider_type == "Ollama":
-            return {"Content-Type": "application/json"}
+    def _render_message(self, m: dict) -> dict:
+        """将统一消息格式渲染为各提供商的请求消息。
+
+        content 支持两种形态：
+          - 字符串：普通文本
+          - 列表（content block，OpenAI 风格）：
+              [{"type":"text","text":"..."},
+               {"type":"image_url","image_url":{"url":"data:image/png;base64,..."}}]
+        按 provider 转换为各自多模态格式（Gemini inlineData / Anthropic image / Ollama image）。
+        """
+        role = m.get("role", "user")
+        content = m.get("content")
+
         if self.provider_type == "Gemini":
-            return {"Content-Type": "application/json"}
+            parts = []
+            if isinstance(content, str):
+                if content:
+                    parts.append({"text": content})
+            elif isinstance(content, list):
+                for b in content:
+                    if b.get("type") == "text" and b.get("text"):
+                        parts.append({"text": b["text"]})
+                    elif b.get("type") == "image_url":
+                        url = b.get("image_url", {}).get("url", "")
+                        if url.startswith("data:"):
+                            mime = url[5:url.find(";base64,")]
+                            b64 = url[url.find(";base64,") + len(";base64,"):]
+                            parts.append({"inlineData": {"mimeType": mime, "data": b64}})
+                        elif url:
+                            parts.append({"fileData": {"fileUri": url}})
+            return {"role": "model" if role == "assistant" else "user", "parts": parts}
+
         if self.provider_type == "Anthropic":
-            return {
-                "Content-Type": "application/json",
-                "x-api-key": self.api_key or "",
-                "anthropic-version": "2023-06-01",
-            }
-        return {"Content-Type": "application/json", "Authorization": f"Bearer {self.api_key or ''}"}
+            if isinstance(content, str):
+                out = content
+            else:
+                out = []
+                for b in content:
+                    if b.get("type") == "text":
+                        out.append({"type": "text", "text": b["text"]})
+                    elif b.get("type") == "image_url":
+                        url = b.get("image_url", {}).get("url", "")
+                        if url.startswith("data:"):
+                            mime = url[5:url.find(";base64,")]
+                            b64 = url[url.find(";base64,") + len(";base64,"):]
+                            out.append({"type": "image", "source": {"type": "base64", "media_type": mime, "data": b64}})
+                if not out:
+                    out = ""
+            return {"role": role, "content": out}
+
+        if self.provider_type == "Ollama":
+            # /api/chat 期望 content 为纯字符串，图片放在独立 images 数组中
+            if isinstance(content, str):
+                return {"role": role, "content": content}
+            text_parts = []
+            images = []
+            for b in content:
+                if b.get("type") == "text":
+                    text_parts.append(b.get("text", ""))
+                elif b.get("type") == "image_url":
+                    url = b.get("image_url", {}).get("url", "")
+                    if url.startswith("data:"):
+                        b64 = url[url.find(";base64,") + len(";base64,"):]
+                        images.append(b64)
+                    elif url:
+                        images.append(url)
+            return {"role": role, "content": "".join(text_parts), "images": images}
+
+        # OpenAI / Custom：透传（image_url 原生支持）
+        return {"role": role, "content": content}
 
     # ------------------------------------------------------------------
     # 响应解析
