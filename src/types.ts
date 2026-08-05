@@ -47,7 +47,8 @@ export interface AgentDetail extends Agent {
   tools: AgentTool[];
 }
 
-// 角色卡 / 人设卡（批次B）：persona 的结构化 JSON 形态
+// 角色卡 / 人设卡（批次B + 批次A）：persona 的结构化 JSON 形态
+// 批A新增：identity / ishiki / publicIshiki 三段式 + yuan 底座 + role 编排角色
 export interface PersonaCard {
   avatar: string;
   name: string;
@@ -55,7 +56,20 @@ export interface PersonaCard {
   summary: string;
   tone_example: string;
   system_prompt: string;
+  identity: string;
+  ishiki: string;
+  publicIshiki: string;
+  yuan: string;
+  role: string;
 }
+
+// 三段式 persona 的空值（批次A）
+export const EMPTY_THREE_LAYER = { identity: "", ishiki: "", publicIshiki: "", yuan: "", role: "" };
+
+// yuan 底座可选值（批次A）
+export const YUAN_OPTIONS = ["hanako", "butter", "ming", "kong"] as const;
+// 编排角色可选值（批次A）
+export const ROLE_OPTIONS = ["general_manager", "reviewer", "member"] as const;
 
 // 首次使用引导状态（批次B）
 export interface OnboardingState {
@@ -64,7 +78,7 @@ export interface OnboardingState {
   onboarded: boolean;
 }
 
-// 解析 persona：兼容 JSON 结构化与旧版纯文本两种形态
+// 解析 persona：兼容 JSON 结构化、三段式 JSON 与旧版纯文本三种形态
 export function parsePersona(persona?: string | null): PersonaCard | null {
   if (!persona) return null;
   const t = persona.trim();
@@ -79,6 +93,11 @@ export function parsePersona(persona?: string | null): PersonaCard | null {
         summary: String(d.summary ?? ""),
         tone_example: String(d.tone_example ?? ""),
         system_prompt: String(d.system_prompt ?? ""),
+        identity: String(d.identity ?? ""),
+        ishiki: String(d.ishiki ?? ""),
+        publicIshiki: String(d.publicIshiki ?? ""),
+        yuan: String(d.yuan ?? ""),
+        role: String(d.role ?? ""),
       };
     }
     return null;
