@@ -147,7 +147,7 @@ export const deleteConversation = (conversation: string) =>
   request<{ ok: boolean; name: string }>("POST", "delete_conversation", { conversation }, true);
 export const listMessages = (conversation: string) =>
   request<{ messages: ChatMessage[] }>("GET", "list_messages", { conversation });
-export const sendMessage = (conversation: string, content: string, model?: string) =>
+export const sendMessage = (conversation: string, content: string, model?: string, imageData?: string) =>
   request<{
     ok: boolean;
     reply: string;
@@ -158,7 +158,7 @@ export const sendMessage = (conversation: string, content: string, model?: strin
   }>(
     "POST",
     "send_message",
-    model ? { conversation, content, model } : { conversation, content },
+    { conversation, content, model, image_data: imageData },
     true
   );
 

@@ -12,6 +12,7 @@ export default function ChatArea({ agent, conversation, providers }: Props) {
   const [selectedProvider, setSelectedProvider] = useState<string>("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
+  const [imageData, setImageData] = useState<string>("");
   const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
   const [rating, setRating] = useState(0);
@@ -19,6 +20,21 @@ export default function ChatArea({ agent, conversation, providers }: Props) {
   const [ratingError, setRatingError] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // 选择图片：读为 base64 data URL，供多模态发送
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setRatingError("请选择图片文件");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => setImageData(typeof reader.result === "string" ? reader.result : "");
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  };
 
   // 输入框自适应高度
   const autoGrow = () => {
@@ -89,8 +105,9 @@ export default function ChatArea({ agent, conversation, providers }: Props) {
 
   const send = async () => {
     const content = input.trim();
-    if (!content || !conversation || sending) return;
+    if ((!content && !imageData) || !conversation || sending) return;
     setInput("");
+    setImageData("");
     // 重置输入框高度，避免发送后仍保持多行高度
     if (inputRef.current) inputRef.current.style.height = "auto";
     setSending(true);
@@ -98,7 +115,7 @@ export default function ChatArea({ agent, conversation, providers }: Props) {
     const userMsg: ChatMessage = {
       name: `tmp-${Date.now()}`,
       role: "User",
-      content,
+      content: imageData ? `${content}\n[附图片]` : content,
       agent: agent?.name || "",
       tokens: 0,
       latency_ms: 0,
@@ -107,7 +124,7 @@ export default function ChatArea({ agent, conversation, providers }: Props) {
     setMessages((m) => [...m, userMsg]);
     try {
       const modelToUse = selectedProvider || undefined;
-      const res = await sendMessage(conversation.name, content, modelToUse);
+      const res = await sendMessage(conversation.name, content, modelToUse, imageData || undefined);
       if (res.ok) {
         const asstMsg: ChatMessage = {
           name: `tmp-${Date.now()}`,
@@ -286,24 +303,54 @@ export default function ChatArea({ agent, conversation, providers }: Props) {
       )}
 
       <div className="composer">
-        <textarea
-          ref={inputRef}
-          className="textarea"
-          value={input}
-          onChange={(e) => {
-            setInput(e.target.value);
-            autoGrow();
-          }}
-          onKeyDown={(e) => {
-            // 中文输入法组合输入时（isComposing）按下 Enter 不应发送
-            if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
-              e.preventDefault();
-              send();
-            }
-          }}
-          placeholder="输入消息，Enter 发送，Shift+Enter 换行"
+        {imageData && (
+          <div className="composer-img-preview">
+            <img src={imageData} alt="待发送图片" />
+            <button
+              type="button"
+              className="composer-img-remove"
+              onClick={() => setImageData("")}
+              aria-label="移除图片"
+            >
+              ✕
+            </button>
+          </div>
+        )}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          style={{ display: "none" }}
+          onChange={handleFileChange}
         />
-        <button className="btn btn-primary" onClick={send} disabled={sending || !input.trim()}>
+        <div className="composer-left">
+          <button
+            type="button"
+            className="btn btn-ghost composer-img-btn"
+            onClick={() => fileInputRef.current?.click()}
+            title="上传图片（多模态）"
+          >
+            🖼️
+          </button>
+          <textarea
+            ref={inputRef}
+            className="textarea"
+            value={input}
+            onChange={(e) => {
+              setInput(e.target.value);
+              autoGrow();
+            }}
+            onKeyDown={(e) => {
+              // 中文输入法组合输入时（isComposing）按下 Enter 不应发送
+              if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+                e.preventDefault();
+                send();
+              }
+            }}
+            placeholder="输入消息，Enter 发送，Shift+Enter 换行"
+          />
+        </div>
+        <button className="btn btn-primary" onClick={send} disabled={sending || (!input.trim() && !imageData)}>
           {sending ? <span className="spinner" /> : "发送"}
         </button>
       </div>
