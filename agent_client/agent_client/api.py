@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import json
+import logging
 
 import frappe
 import requests
@@ -20,6 +21,8 @@ from agent_client.agent_client.llm_client import (
 )
 from agent_client.agent_client.tool_runner import execute_tool, get_tools_schema
 from agent_client.agent_client import orchestration as orch
+
+logger = logging.getLogger("agent_client.api")
 
 
 # ======================================================================
@@ -1299,16 +1302,25 @@ def decompose_task(channel: str, request: str):
 
 
 @frappe.whitelist()
+def list_role_templates():
+    """获取内置编排角色模板（总经理 / 质检 / 成员）。每个模板包含 persona 三段式 + yuan + role + 推荐工具。"""
+    return orch.list_role_templates()
+
+
+@frappe.whitelist()
 def claim_task(task: str, agent: str):
     """成员领取任务：pending → claimed。"""
-    doc = orch._get_task(task)
-    if doc.status != orch.STATUS_PENDING:
-        frappe.throw(_("任务 {0} 状态为 {1}，仅 pending 可领取").format(task, doc.status))
-    if not frappe.db.exists("Agent", agent):
-        frappe.throw(_("Agent {0} 不存在").format(agent))
-    doc.assigned_to = agent
-    doc.status = orch.STATUS_CLAIMED
-    doc.save(ignore_permissions=True)
+    # 并发保护：通过行锁原子化领取，避免多成员同时领取同一任务
+    doc, conflict = orch.claim_task_atomic(task, agent)
+    if conflict:
+        cur = orch._get_task(task)
+        logger.warning(
+            "claim_task_conflict task=%s assigned_to=%s",
+            orch._mask_log(task), orch._mask_log(cur.assigned_to or ""),
+        )
+        frappe.throw(_("任务 {0} 已被领取（状态 {1}），无法重复领取").format(
+            task, cur.status))
+    logger.info("claim_task_ok task=%s agent=%s", orch._mask_log(task), orch._mask_log(agent))
     return {"ok": True, "name": doc.name, "status": doc.status, "assigned_to": doc.assigned_to}
 
 

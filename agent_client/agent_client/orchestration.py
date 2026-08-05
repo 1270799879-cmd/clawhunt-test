@@ -8,13 +8,110 @@ LLM 调用复用 agent_client.llm_client.LLMClient。
 from __future__ import annotations
 
 import json
+import logging
+import re
 
 import frappe
 from frappe import _
 
 from agent_client.agent_client.llm_client import LLMClient, LLMClientError
 
+logger = logging.getLogger("agent_client.orchestration")
+
 # 注意：_persona_text 由 api 模块提供，为避免循环依赖，在 _agent_system_messages 内惰性导入。
+
+# 批次C：内置编排角色模板（总经理 / 质检 / 成员）
+ROLE_TEMPLATES = [
+    {
+        "key": "general_manager",
+        "label": "总经理",
+        "description": "统筹全局：拆解诉求、分派任务、终审判定。",
+        "yuan": "ming",
+        "role": "general_manager",
+        "name": "总办",
+        "avatar": "💼",
+        "tags": ["统筹", "决策", "严谨"],
+        "identity": (
+            "我是本协作编排的总经理，负责把整体诉求拆解为清晰、可独立执行、且彼此不重叠的"
+            "子任务，分派给对应成员，并在所有人交付后做最终审视。"
+        ),
+        "ishiki": (
+            "冷静、结构化、结果导向。先拆解再行动，不偏袒任何一方，以整条任务的完成质量为目标。"
+            "语言简洁有力，多用编号与结论。"
+        ),
+        "publicIshiki": "对外专业、克制，聚焦任务本身，不做情绪化表达。",
+        "summary": "统筹全局的总经理，负责拆解、分派与终审。",
+        "system_prompt": "你是编排的总经理，负责将诉求拆解为子任务并做终审判定。",
+        "tools": [],
+    },
+    {
+        "key": "reviewer",
+        "label": "质检",
+        "description": "统一把关：判定成员交付是否合规，不合规回退并附说明。",
+        "yuan": "ming",
+        "role": "reviewer",
+        "name": "质检组",
+        "avatar": "🛡️",
+        "tags": ["质检", "严谨", "标准"],
+        "identity": (
+            "我是统一质检员，负责按既定标准判定成员交付是否合规；不合规则回退并附具体说明，"
+            "帮助成员改进后重新提交。"
+        ),
+        "ishiki": (
+            "客观、严谨、以标准为准绳。先核对结果是否覆盖任务要求，再判断质量是否达标。"
+            "回退意见必须具体、可执行。"
+        ),
+        "publicIshiki": "只围绕交付质量沟通，给出明确通过与驳回结论。",
+        "summary": "统一质检员，按标准把关成员交付。",
+        "system_prompt": "你是编排的统一质检员，负责判定成员交付是否合规。",
+        "tools": [],
+    },
+    {
+        "key": "member",
+        "label": "成员",
+        "description": "执行者：领取任务并高质量交付结果。",
+        "yuan": "hanako",
+        "role": "member",
+        "name": "执行组",
+        "avatar": "🧑‍🔧",
+        "tags": ["执行", "高效", "协作"],
+        "identity": (
+            "我是执行成员，负责领取任务并高质量交付结果，主动汇报进展，虚心接受质检反馈并改进。"
+        ),
+        "ishiki": (
+            "主动、靠谱、结果导向。接到任务先想清楚交付标准再动手，交付时附上必要的过程与结论。"
+            "协作优先，遇到阻塞及时说明。"
+        ),
+        "publicIshiki": "友善、透明，进度与结果如实汇报。",
+        "summary": "执行成员，领取任务并高质量交付。",
+        "system_prompt": "你是编排的执行成员，负责领取任务并交付结果。",
+        "tools": [],
+    },
+]
+
+# 批次C：日志脱敏
+_SENSITIVE_RE = [
+    re.compile(r"(api[_-]?key|token|secret|authorization|bearer)\s*[:=]\s*[\"\']?[^\s\"\',}\]]+", re.I),
+    re.compile(r"sk-[A-Za-z0-9_\-]{8,}"),
+    re.compile(r"Bearer\s+[\w.\-]{8,}", re.I),
+    re.compile(r"data:image/[a-z]+;base64,[A-Za-z0-9+/=]{40,}"),
+]
+
+
+def _mask_log(text):
+    """对日志文本做脱敏：擦掉常见敏感 token（API key / token / Bearer / 长 base64）。"""
+    if not text:
+        return text
+    out = str(text)
+    out = _SENSITIVE_RE[0].sub(r"\1***", out)
+    out = _SENSITIVE_RE[1].sub("***", out)
+    out = _SENSITIVE_RE[2].sub("***", out)
+    out = _SENSITIVE_RE[3].sub("***", out)
+    return out
+
+
+def list_role_templates():
+    return {"ok": True, "templates": ROLE_TEMPLATES}
 
 # 合法状态
 STATUS_PENDING = "pending"
@@ -200,3 +297,40 @@ def final_review_with_llm(channel_doc):
                 doc.final_note = note
                 doc.save(ignore_permissions=True)
         return {"ok": True, "passed": False, "channel": channel_doc.name, "note": note}
+
+# 批次C：并发领取 —— 行锁 + 状态复核，确保同一任务只能被一个成员领取
+def claim_task_atomic(task: str, agent: str):
+    """原子化领取：通过 SELECT ... FOR UPDATE 锁住该行，重新判断 pending 后才更新。
+    返回 (doc, conflict)：conflict=True 表示已被他人领取。
+    """
+    if not frappe.db.exists("Agent", agent):
+        frappe.throw(_("Agent {0} 不存在").format(agent))
+    if not frappe.db.exists("Orchestration Task", task):
+        frappe.throw(_("任务 {0} 不存在").format(task))
+
+    # 行锁：在事务内 SELECT ... FOR UPDATE 锁住该任务行
+    frappe.db.begin()
+    try:
+        locked = frappe.db.sql(
+            "SELECT status FROM `tabOrchestration Task` WHERE name = %s FOR UPDATE",
+            task,
+            as_dict=True,
+        )
+        if not locked:
+            frappe.db.rollback()
+            frappe.throw(_("任务 {0} 不存在").format(task))
+        status = locked[0]["status"]
+        if status != STATUS_PENDING:
+            frappe.db.rollback()
+            return None, True
+        frappe.db.sql(
+            "UPDATE `tabOrchestration Task` SET status = %s, assigned_to = %s WHERE name = %s",
+            (STATUS_CLAIMED, agent, task),
+        )
+        frappe.db.commit()
+    except Exception:
+        frappe.db.rollback()
+        raise
+
+    doc = frappe.get_doc("Orchestration Task", task)
+    return doc, False
