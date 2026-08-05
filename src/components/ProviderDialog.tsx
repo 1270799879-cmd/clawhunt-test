@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import type { LLMProvider, ProviderModel } from "../types";
 import {
   deleteProvider,
+  fetchProviderModels,
   getProvider,
   listProviders,
   saveProvider,
@@ -56,6 +57,7 @@ export default function ProviderDialog({ open, onClose, onChanged }: Props) {
   const [error, setError] = useState("");
   const [toast, setToast] = useState("");
   const [testingName, setTestingName] = useState("");
+  const [fetchingModels, setFetchingModels] = useState(false);
 
   const showToast = (msg: string) => {
     setToast(msg);
@@ -189,6 +191,55 @@ export default function ProviderDialog({ open, onClose, onChanged }: Props) {
 
   const addModel = () => {
     setForm((f) => ({ ...f, models: [...f.models, { model_name: "", is_default: false }] }));
+  };
+
+  // 从供应商自动拉取模型列表（参考 HanaAgent 的模型拉取体验）
+  const handleFetchModels = async () => {
+    if (!form.provider_name.trim()) {
+      setError("请先填写供应商名称");
+      return;
+    }
+    if (!form.api_base_url.trim()) {
+      setError("请先填写 API Base URL");
+      return;
+    }
+    setFetchingModels(true);
+    setError("");
+    try {
+      const res = await fetchProviderModels(form.provider_name.trim());
+      if (!res.ok) {
+        setError(res.error || "拉取模型失败");
+        return;
+      }
+      const fetched = res.models || [];
+      if (fetched.length === 0) {
+        setError("供应商未返回任何模型");
+        return;
+      }
+      // 去重合并：保留已有模型的默认标记，新模型默认非默认
+      const existing = new Map(form.models.map((m) => [m.model_name, m.is_default]));
+      const merged: { model_name: string; is_default: boolean }[] = [];
+      for (const m of fetched) {
+        const name = m.model_name;
+        if (!name) continue;
+        if (existing.has(name)) {
+          merged.push({ model_name: name, is_default: existing.get(name) ?? false });
+          existing.delete(name);
+        } else {
+          merged.push({ model_name: name, is_default: false });
+        }
+      }
+      // 追加原表单中已存在但拉取结果未返回的模型
+      for (const [name, isDefault] of existing) {
+        merged.push({ model_name: name, is_default: isDefault });
+      }
+      setForm((f) => ({ ...f, models: merged }));
+      showToast(`已从供应商拉取 ${fetched.length} 个模型`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "拉取模型失败");
+    } finally {
+      setFetchingModels(false);
+    }
   };
 
   const removeModel = (i: number) => {
@@ -372,9 +423,19 @@ export default function ProviderDialog({ open, onClose, onChanged }: Props) {
             <div className="form-group">
               <div className="form-label" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <span>可用模型</span>
-                <button className="btn btn-ghost" style={{ padding: "2px 8px", fontSize: 12 }} onClick={addModel}>
-                  ＋ 添加模型
-                </button>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button
+                    className="btn"
+                    style={{ padding: "2px 8px", fontSize: 12 }}
+                    onClick={handleFetchModels}
+                    disabled={fetchingModels}
+                  >
+                    {fetchingModels ? <span className="spinner" /> : "⇩ 从供应商拉取"}
+                  </button>
+                  <button className="btn btn-ghost" style={{ padding: "2px 8px", fontSize: 12 }} onClick={addModel}>
+                    ＋ 添加模型
+                  </button>
+                </div>
               </div>
               {form.models.length === 0 ? (
                 <div className="empty" style={{ padding: 16 }}>

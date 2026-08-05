@@ -96,6 +96,9 @@ export const deleteProvider = (name: string) =>
   request<{ ok: boolean }>("POST", "delete_provider", { provider_name: name });
 export const testProvider = (name: string) =>
   request<{ ok: boolean; reply: string; latency_ms: number }>("GET", "test_provider", { provider_name: name });
+/** 从供应商自动拉取可用模型列表（阶段 4 · 参考 HanaAgent 模型拉取体验） */
+export const fetchProviderModels = (name: string) =>
+  request<{ ok: boolean; models: { model_name: string }[]; error?: string }>("GET", "fetch_models", { provider_name: name });
 
 // ---------- Agent ----------
 // 桌面端优先走 IPC 通道（统一数据获取方式），失败回退 HTTP
