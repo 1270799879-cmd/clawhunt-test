@@ -10,9 +10,11 @@ from __future__ import annotations
 import json
 import logging
 import re
+import time
 
 import frappe
 from frappe import _
+from pymysql.err import OperationalError, InterfaceError, InternalError
 
 from agent_client.agent_client.llm_client import LLMClient, LLMClientError
 
@@ -299,80 +301,151 @@ def final_review_with_llm(channel_doc):
         return {"ok": True, "passed": False, "channel": channel_doc.name, "note": note}
 
 # 批次C：并发领取 —— 行锁 + 状态复核，确保同一任务只能被一个成员领取
+# 可重试的数据库瞬态错误码：连接断开 / 锁等待超时 / 死锁
+_RETRYABLE_DB_CODES = {0, 2006, 2013, 1205, 1213}
+_CLAIM_RETRY_MAX = 3
+
+
+def _is_retryable_db_error(e):
+    """判断异常是否属于可重试的数据库瞬态错误（连接断开 / 锁等待超时 / 死锁）。"""
+    if isinstance(e, (OperationalError, InterfaceError)):
+        code = e.args[0] if e.args else None
+        return code is None or code in _RETRYABLE_DB_CODES
+    if isinstance(e, InternalError):
+        return bool(e.args) and e.args[0] in _RETRYABLE_DB_CODES
+    return False
+
+
+def _reset_db_connection():
+    """重置数据库连接：连接断开后恢复新的可用连接。"""
+    try:
+        frappe.db.close()
+    except Exception:
+        pass
+    try:
+        frappe.db.connect()
+    except Exception:
+        pass
+
+
+def _read_task_safe(task):
+    """读取任务 doc，连接抖动时重试，避免 commit 后读取失败造成「已领取但报错」的不确定态。"""
+    for _ in range(_CLAIM_RETRY_MAX):
+        try:
+            return frappe.get_doc("Orchestration Task", task)
+        except Exception as e:
+            if _is_retryable_db_error(e):
+                _reset_db_connection()
+                time.sleep(0.2)
+                continue
+            raise
+    raise RuntimeError("读取任务失败（重试 %d 次耗尽）" % _CLAIM_RETRY_MAX)
+
+
+# 批次C：并发领取 —— 行锁 + 状态复核，确保同一任务只能被一个成员领取
+# 边界补强：连接断开 / 死锁 / 锁等待超时有限重试；同成员重复请求幂等；commit 后读取抖动重试
 def claim_task_atomic(task: str, agent: str):
     """原子化领取：通过 SELECT ... FOR UPDATE 锁住该行，重新判断 pending 后才更新。
-    返回 (doc, conflict)：conflict=True 表示已被他人领取。
+    对连接断开 / 死锁 / 锁等待超时等瞬态错误在 _CLAIM_RETRY_MAX 次内重试；
+    同成员对已领取任务重复请求视为幂等成功。
+    返回 (doc, conflict)：conflict=True 表示已被【其他】成员领取。
     """
     logger.info(
         "claim_task_atomic.enter task=%s agent=%s",
         _mask_log(task), _mask_log(agent),
     )
-    if not frappe.db.exists("Agent", agent):
-        logger.warning(
-            "claim_task_atomic.agent_missing task=%s agent=%s",
-            _mask_log(task), _mask_log(agent),
-        )
-        frappe.throw(_("Agent {0} 不存在").format(agent))
-    if not frappe.db.exists("Orchestration Task", task):
-        logger.warning(
-            "claim_task_atomic.task_missing task=%s agent=%s",
-            _mask_log(task), _mask_log(agent),
-        )
-        frappe.throw(_("任务 {0} 不存在").format(task))
-
-    # 行锁：在事务内 SELECT ... FOR UPDATE 锁住该任务行
-    frappe.db.begin()
-    try:
-        locked = frappe.db.sql(
-            "SELECT status FROM `tabOrchestration Task` WHERE name = %s FOR UPDATE",
-            task,
-            as_dict=True,
-        )
-        if not locked:
-            logger.warning(
-                "claim_task_atomic.lock_empty task=%s agent=%s",
+    attempt = 0
+    while True:
+        attempt += 1
+        try:
+            if not frappe.db.exists("Agent", agent):
+                logger.warning(
+                    "claim_task_atomic.agent_missing task=%s agent=%s",
+                    _mask_log(task), _mask_log(agent),
+                )
+                frappe.throw(_("Agent {0} 不存在").format(agent))
+            if not frappe.db.exists("Orchestration Task", task):
+                logger.warning(
+                    "claim_task_atomic.task_missing task=%s agent=%s",
+                    _mask_log(task), _mask_log(agent),
+                )
+                frappe.throw(_("任务 {0} 不存在").format(task))
+            frappe.db.begin()
+            locked = frappe.db.sql(
+                "SELECT status, assigned_to FROM `tabOrchestration Task` WHERE name = %s FOR UPDATE",
+                task,
+                as_dict=True,
+            )
+            if not locked:
+                logger.warning(
+                    "claim_task_atomic.lock_empty task=%s agent=%s",
+                    _mask_log(task), _mask_log(agent),
+                )
+                frappe.db.rollback()
+                frappe.throw(_("任务 {0} 不存在").format(task))
+            status = locked[0]["status"]
+            current_owner = locked[0].get("assigned_to")
+            logger.info(
+                "claim_task_atomic.locked task=%s agent=%s status=%s owner=%s",
+                _mask_log(task), _mask_log(agent), _mask_log(status), _mask_log(current_owner or ""),
+            )
+            if status != STATUS_PENDING:
+                # 幂等：任务已由同一成员领取（可能上次成功但响应丢失）
+                if status == STATUS_CLAIMED and current_owner == agent:
+                    logger.info(
+                        "claim_task_atomic.idempotent task=%s agent=%s",
+                        _mask_log(task), _mask_log(agent),
+                    )
+                    frappe.db.rollback()
+                    return _read_task_safe(task), False
+                logger.warning(
+                    "claim_task_atomic.conflict task=%s agent=%s current_status=%s owner=%s want=%s",
+                    _mask_log(task), _mask_log(agent), _mask_log(status), _mask_log(current_owner or ""),
+                    _mask_log(STATUS_PENDING),
+                )
+                frappe.db.rollback()
+                return None, True
+            prev = frappe.db.get_value("Orchestration Task", task, "assigned_to")
+            logger.info(
+                "claim_task_atomic.updating task=%s agent=%s prev_assigned_to=%s -> %s",
                 _mask_log(task), _mask_log(agent),
+                _mask_log(prev or ""), _mask_log(agent),
             )
-            frappe.db.rollback()
-            frappe.throw(_("任务 {0} 不存在").format(task))
-        status = locked[0]["status"]
-        logger.info(
-            "claim_task_atomic.locked task=%s agent=%s status=%s",
-            _mask_log(task), _mask_log(agent), _mask_log(status),
-        )
-        if status != STATUS_PENDING:
-            logger.warning(
-                "claim_task_atomic.conflict task=%s agent=%s current_status=%s want=%s",
-                _mask_log(task), _mask_log(agent), _mask_log(status), _mask_log(STATUS_PENDING),
+            frappe.db.sql(
+                "UPDATE `tabOrchestration Task` SET status = %s, assigned_to = %s WHERE name = %s",
+                (STATUS_CLAIMED, agent, task),
             )
-            frappe.db.rollback()
-            return None, True
-        # 更新前记录当前 assigned_to，便于排查归属覆盖
-        prev = frappe.db.get_value("Orchestration Task", task, "assigned_to")
-        logger.info(
-            "claim_task_atomic.updating task=%s agent=%s prev_assigned_to=%s -> %s",
-            _mask_log(task), _mask_log(agent),
-            _mask_log(prev or ""), _mask_log(agent),
-        )
-        frappe.db.sql(
-            "UPDATE `tabOrchestration Task` SET status = %s, assigned_to = %s WHERE name = %s",
-            (STATUS_CLAIMED, agent, task),
-        )
-        frappe.db.commit()
-        logger.info(
-            "claim_task_atomic.committed task=%s agent=%s status=%s",
-            _mask_log(task), _mask_log(agent), _mask_log(STATUS_CLAIMED),
-        )
-    except Exception as e:
-        logger.exception(
-            "claim_task_atomic.error task=%s agent=%s err=%s",
-            _mask_log(task), _mask_log(agent), _mask_log(str(e)),
-        )
-        frappe.db.rollback()
-        raise
+            frappe.db.commit()
+            logger.info(
+                "claim_task_atomic.committed task=%s agent=%s status=%s",
+                _mask_log(task), _mask_log(agent), _mask_log(STATUS_CLAIMED),
+            )
+            break
+        except Exception as e:
+            if _is_retryable_db_error(e) and attempt < _CLAIM_RETRY_MAX:
+                logger.warning(
+                    "claim_task_atomic.retry task=%s agent=%s attempt=%d err=%s",
+                    _mask_log(task), _mask_log(agent), attempt, _mask_log(str(e)),
+                )
+                try:
+                    frappe.db.rollback()
+                except Exception:
+                    pass
+                _reset_db_connection()
+                time.sleep(0.2 * attempt)
+                continue
+            logger.exception(
+                "claim_task_atomic.error task=%s agent=%s err=%s",
+                _mask_log(task), _mask_log(agent), _mask_log(str(e)),
+            )
+            try:
+                frappe.db.rollback()
+            except Exception:
+                pass
+            raise
 
-    doc = frappe.get_doc("Orchestration Task", task)
-    # 领取后复核：确认落库归属未被并发覆盖
+    # 领取后复核：读取落库归属，连接抖动时重试读取
+    doc = _read_task_safe(task)
     final_assigned = doc.assigned_to
     logger.info(
         "claim_task_atomic.done task=%s agent=%s final_assigned_to=%s",
