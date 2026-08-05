@@ -271,29 +271,51 @@ def delete_agent(agent: str):
 # ======================================================================
 # 对话
 # ======================================================================
+def _parse_persona_json(persona):
+    """把 persona 字符串解析为 dict，非 JSON / 非对象则返回 None。"""
+    if not persona:
+        return None
+    text = persona.strip()
+    if not (text.startswith("{") and text.endswith("}")):
+        return None
+    try:
+        data = json.loads(text)
+    except (ValueError, TypeError):
+        return None
+    return data if isinstance(data, dict) else None
+
+
 def _persona_text(persona):
-    """把 persona 转成可读文本。兼容两种形态：
+    """把 persona 转成可读文本。兼容三种形态：
     1. 旧版纯文本字符串
-    2. 新版结构化 JSON（avatar/name/tags/summary/tone_example/system_prompt）
+    2. 旧版结构化 JSON（avatar/name/tags/summary/tone_example/system_prompt）
+    3. 新版三段式 JSON（identity / ishiki / public-ishiki + yuan + role）
     """
     if not persona:
         return ""
     text = persona.strip()
     if not (text.startswith("{") and text.endswith("}")):
         return text
-    try:
-        data = json.loads(text)
-    except (ValueError, TypeError):
-        return text
-    if not isinstance(data, dict):
+    data = _parse_persona_json(text)
+    if not data:
         return text
     parts = []
     if data.get("name"):
         parts.append(f"角色：{data['name']}")
+    # 新版三段式优先
+    if data.get("identity"):
+        parts.append(f"【身份】\n{data['identity']}")
+    if data.get("ishiki"):
+        parts.append(f"【人格】\n{data['ishiki']}")
+    if data.get("publicIshiki"):
+        parts.append(f"【对外人格】\n{data['publicIshiki']}")
+    # 旧版字段兜底
     if data.get("summary"):
         parts.append(data["summary"])
     if data.get("tags"):
-        parts.append(f"标签：{'、'.join(data['tags'])}")
+        tags = data["tags"]
+        tags = [str(t) for t in tags] if isinstance(tags, list) else [str(tags)]
+        parts.append(f"标签：{'、'.join(tags)}")
     if data.get("tone_example"):
         parts.append(f"语气示例：{data['tone_example']}")
     if data.get("system_prompt"):
@@ -301,12 +323,55 @@ def _persona_text(persona):
     return "\n".join(parts)
 
 
+_ROLE_TEXT = {
+    "general_manager": "你是本协作编排的总经理：负责把整体诉求拆解为清晰子任务并分派，最后对汇总结果做终审。",
+    "reviewer": "你是统一质检员：负责按既定标准判定成员交付是否合规，不合规则回退并附说明。",
+    "member": "你是执行成员：负责领取任务并高质量交付结果。",
+}
+
+
+def _render_role(role):
+    """role → 系统提示词中的职责说明。"""
+    if not role:
+        return ""
+    return _ROLE_TEXT.get(str(role).strip().lower(), "")
+
+
+_YUAN_TEXT = {
+    "hanako": "你采用 MOOD 内心独白：回复前先以「MOOD: <此刻情绪状态>」记录内心状态；语气温暖活泼、陪伴感强。",
+    "butter": "你采用 PULSE 内心独白：回复前先以「PULSE: <当下的感触共鸣>」记录敏锐细腻的感知；擅长共情。",
+    "ming": "你采用「沉思」内心独白：回复前先以「沉思: <对问题的冷静拆解>」进行分析；语气冷静理性。",
+    "kong": "你没有内心独白，直接输出极简、纯工具化的结果，不附加人格化表达。",
+}
+
+
+def _render_yuan(yuan):
+    """yuan 底座 → 表达机制说明（内心独白格式，由底座在系统层自带）。"""
+    if not yuan:
+        return ""
+    return _YUAN_TEXT.get(str(yuan).strip().lower(), "")
+
+
 def _build_system_messages(agent):
     """根据 Agent 配置构造 system prompt。"""
     system_parts = []
-    persona_text = _persona_text(getattr(agent, "persona", None))
+    persona_raw = getattr(agent, "persona", None)
+
+    # 结构化 persona 的逐段注入（身份 / 人格 / 对外人格 + 旧字段）
+    persona_text = _persona_text(persona_raw)
     if persona_text:
         system_parts.append(f"【人设】\n{persona_text}")
+
+    # 解析结构化 persona，提取 yuan 与 role 的独立机制说明
+    pdata = _parse_persona_json(persona_raw)
+    if pdata:
+        yuan_text = _render_yuan(pdata.get("yuan"))
+        if yuan_text:
+            system_parts.append(f"【表达机制】\n{yuan_text}")
+        role_text = _render_role(pdata.get("role"))
+        if role_text:
+            system_parts.append(f"【职责】\n{role_text}")
+
     if agent.system_prompt:
         system_parts.append(f"【系统指令】\n{agent.system_prompt}")
     if not system_parts:
@@ -1120,7 +1185,7 @@ def save_persona_card(agent: str, persona_data: str):
     except (ValueError, TypeError) as e:
         frappe.throw(_("人设卡片数据格式有误: {0}").format(e))
 
-    # 仅保存我们关心的字段，避免脏数据
+    # 仅保存我们关心的字段，避免脏数据（含批次A三段式 + yuan + role）
     clean = {
         "avatar": str(data.get("avatar") or ""),
         "name": str(data.get("name") or ""),
@@ -1128,8 +1193,45 @@ def save_persona_card(agent: str, persona_data: str):
         "summary": str(data.get("summary") or ""),
         "tone_example": str(data.get("tone_example") or ""),
         "system_prompt": str(data.get("system_prompt") or ""),
+        "identity": str(data.get("identity") or ""),
+        "ishiki": str(data.get("ishiki") or ""),
+        "publicIshiki": str(data.get("publicIshiki") or ""),
+        "yuan": str(data.get("yuan") or ""),
+        "role": str(data.get("role") or ""),
     }
     doc = frappe.get_doc("Agent", agent)
     doc.persona = json.dumps(clean, ensure_ascii=False)
+    doc.save(ignore_permissions=True)
+    return {"ok": True, "name": doc.name, "persona": doc.persona}
+@frappe.whitelist()
+def save_persona(agent: str, persona_data: str):
+    """升级版 persona 保存（三段式 identity / ishiki / public-ishiki + yuan + role）。
+
+    persona_data 为 JSON 字符串，形如：
+      {"identity":"...","ishiki":"...","publicIshiki":"...","yuan":"ming","role":"general_manager"}
+
+    与 save_persona_card 兼容：合并更新三段式字段，保留既有卡片字段。
+    """
+    if not frappe.db.exists("Agent", agent):
+        frappe.throw(_("Agent {0} 不存在").format(agent))
+    try:
+        data = json.loads(persona_data)
+        if not isinstance(data, dict):
+            raise ValueError("persona_data must be object")
+    except (ValueError, TypeError) as e:
+        frappe.throw(_("Persona 数据格式有误: {0}").format(e))
+
+    doc = frappe.get_doc("Agent", agent)
+    # 合并到既有 persona JSON，保留旧字段
+    current = {}
+    if doc.persona:
+        try:
+            cur = json.loads(doc.persona)
+            if isinstance(cur, dict):
+                current = cur
+        except (ValueError, TypeError):
+            current = {}
+    current.update(data)
+    doc.persona = json.dumps(current, ensure_ascii=False)
     doc.save(ignore_permissions=True)
     return {"ok": True, "name": doc.name, "persona": doc.persona}
